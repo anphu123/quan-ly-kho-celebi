@@ -1,0 +1,33 @@
+# Node
+node_modules/
+dist/
+build/
+.turbo/
+
+# Env files
+.env
+.env.local
+.env.*.local
+
+# Logs
+*.log
+npm-debug.log*
+yarn-error.log*
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/settings.json
+.idea/
+
+# Prisma
+apps/backend/prisma/migrations/*.sql
+
+# Build artifacts
+apps/web/dist/
+apps/backend/dist/
+
+# Coverage
+coverage/

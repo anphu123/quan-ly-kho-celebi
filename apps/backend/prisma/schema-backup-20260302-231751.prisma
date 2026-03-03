@@ -1,0 +1,626 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ===========================
+// IDENTITY & ACCESS MANAGEMENT
+// ===========================
+
+enum UserRole {
+  SUPER_ADMIN        // Quản trị hệ thống
+  INVENTORY_MANAGER  // Quản lý kho
+  CASHIER            // Thu ngân
+  ACCOUNTANT         // Kế toán
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  password  String
+  fullName  String
+  role      UserRole @default(CASHIER)
+  isActive  Boolean  @default(true)
+  
+  lastLoginAt DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  // Relations
+  stockMovements     StockMovement[]
+  stocktakes         Stocktake[]
+  purchaseOrders     PurchaseOrder[]
+  goodsReceipts      GoodsReceipt[]
+  salesOrders        SalesOrder[]
+  cashEntries        CashEntry[]
+  stockAdjustments   StockAdjustment[]
+
+  @@map("users")
+}
+
+// ===========================
+// CATALOG / MASTER DATA
+// ===========================
+
+model Category {
+  id          String  @id @default(cuid())
+  name        String
+  code        String  @unique
+  description String?
+  parentId    String?
+  
+  parent   Category?  @relation("CategoryHierarchy", fields: [parentId], references: [id])
+  children Category[] @relation("CategoryHierarchy")
+  products Product[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("categories")
+}
+
+model Brand {
+  id        String    @id @default(cuid())
+  name      String    @unique
+  code      String    @unique
+  logo      String?
+  
+  products  Product[]
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  @@map("brands")
+}
+
+model UnitOfMeasure {
+  id          String  @id @default(cuid())
+  name        String  @unique // "Lon", "Thùng", "Chai", "Kg"
+  code        String  @unique // "LON", "THUNG", "CHAI", "KG"
+  description String?
+  
+  products         Product[]
+  productUnits     ProductUnit[]
+  purchaseOrderItems PurchaseOrderItem[]
+  goodsReceiptItems  GoodsReceiptItem[]
+  salesOrderItems    SalesOrderItem[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("units_of_measure")
+}
+
+model Product {
+  id              String   @id @default(cuid())
+  sku             String   @unique
+  name            String
+  description     String?
+  categoryId      String
+  brandId         String?
+  baseUnitId      String   // Đơn vị cơ bản (VD: Lon)
+  
+  // Pricing
+  costPrice       Decimal  @default(0) @db.Decimal(15, 2) // Giá vốn (MAC)
+  sellingPrice    Decimal  @default(0) @db.Decimal(15, 2) // Giá bán lẻ
+  wholesalePrice  Decimal? @db.Decimal(15, 2)             // Giá bán sỉ
+  
+  // Stock limits
+  minStockLevel   Int      @default(0)
+  maxStockLevel   Int      @default(0)
+  reorderPoint    Int      @default(0)
+  
+  // Metadata
+  image           String?
+  isActive        Boolean  @default(true)
+  
+  category        Category         @relation(fields: [categoryId], references: [id])
+  brand           Brand?           @relation(fields: [brandId], references: [id])
+  baseUnit        UnitOfMeasure    @relation(fields: [baseUnitId], references: [id])
+  
+  // Relations
+  barcodes        Barcode[]
+  productUnits    ProductUnit[]    // Quy đổi đơn vị
+  stockLevels     StockLevel[]
+  stockMovements  StockMovement[]
+  purchaseOrderItems PurchaseOrderItem[]
+  goodsReceiptItems  GoodsReceiptItem[]
+  salesOrderItems    SalesOrderItem[]
+  stockAdjustments   StockAdjustment[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("products")
+}
+
+// Bảng mã vạch (1 SP có thể có nhiều barcode)
+model Barcode {
+  id        String  @id @default(cuid())
+  productId String
+  code      String  @unique
+  isPrimary Boolean @default(false) // Barcode chính
+
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@map("barcodes")
+}
+
+// Quy đổi đơn vị (VD: 1 Thùng = 24 Lon)
+model ProductUnit {
+  id             String  @id @default(cuid())
+  productId      String
+  unitId         String
+  conversionRate Int     // Tỷ lệ quy đổi so với đơn vị cơ bản
+  barcode        String? @unique // Mã vạch riêng cho đơn vị này
+  
+  product Product       @relation(fields: [productId], references: [id], onDelete: Cascade)
+  unit    UnitOfMeasure @relation(fields: [unitId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([productId, unitId])
+  @@map("product_units")
+}
+
+// ===========================
+// INVENTORY MANAGEMENT
+// ===========================
+
+model Warehouse {
+  id          String  @id @default(cuid())
+  code        String  @unique
+  name        String
+  address     String?
+  phone       String?
+  isActive    Boolean @default(true)
+  
+  stockLevels        StockLevel[]
+  stockMovements     StockMovement[]
+  stocktakes         Stocktake[]
+  purchaseOrders     PurchaseOrder[]
+  goodsReceipts      GoodsReceipt[]
+  salesOrders        SalesOrder[]
+  
+  transfersFrom      StockMovement[] @relation("FromWarehouse")
+  transfersTo        StockMovement[] @relation("ToWarehouse")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("warehouses")
+}
+
+// Tồn kho theo kho
+model StockLevel {
+  id          String  @id @default(cuid())
+  productId   String
+  warehouseId String
+  quantity    Int     @default(0) // Số lượng tồn (đơn vị cơ bản)
+  
+  product   Product   @relation(fields: [productId], references: [id])
+  warehouse Warehouse @relation(fields: [warehouseId], references: [id])
+
+  updatedAt DateTime @updatedAt
+
+  @@unique([productId, warehouseId])
+  @@map("stock_levels")
+}
+
+enum StockMovementType {
+  INITIAL         // Nhập đầu kỳ
+  PURCHASE        // Nhập mua hàng
+  SALES           // Xuất bán hàng
+  TRANSFER_IN     // Chuyển kho đến
+  TRANSFER_OUT    // Chuyển kho đi
+  ADJUSTMENT      // Điều chỉnh (kiểm kê)
+  RETURN_IN       // Trả hàng nhập
+  RETURN_OUT      // Trả hàng xuất
+}
+
+// Thẻ kho - Ghi chép mọi xuất nhập tồn
+model StockMovement {
+  id             String            @id @default(cuid())
+  productId      String
+  warehouseId    String
+  type           StockMovementType
+  quantity       Int               // Số lượng (+/-) đơn vị cơ bản
+  runningBalance Int               // Tồn cuối sau giao dịch
+  unitCost       Decimal?          @db.Decimal(15, 2) // Giá vốn lúc giao dịch
+  
+  // References
+  referenceType  String? // "PurchaseOrder", "SalesOrder", "Transfer", "Stocktake"
+  referenceId    String? // ID của phiếu/đơn hàng
+  
+  notes          String?
+  createdById    String
+  
+  product      Product   @relation(fields: [productId], references: [id])
+  warehouse    Warehouse @relation(fields: [warehouseId], references: [id])
+  createdBy    User      @relation(fields: [createdById], references: [id])
+  
+  // For transfers
+  fromWarehouseId String?
+  toWarehouseId   String?
+  fromWarehouse   Warehouse? @relation("FromWarehouse", fields: [fromWarehouseId], references: [id])
+  toWarehouse     Warehouse? @relation("ToWarehouse", fields: [toWarehouseId], references: [id])
+
+  createdAt DateTime @default(now())
+
+  @@index([productId, warehouseId, createdAt])
+  @@map("stock_movements")
+}
+
+enum StocktakeStatus {
+  DRAFT      // Nháp
+  IN_PROGRESS // Đang kiểm
+  COMPLETED   // Hoàn thành
+  CANCELLED   // Hủy
+}
+
+// Phiếu kiểm kê
+model Stocktake {
+  id            String          @id @default(cuid())
+  code          String          @unique
+  warehouseId   String
+  status        StocktakeStatus @default(DRAFT)
+  scheduledDate DateTime
+  completedAt   DateTime?
+  notes         String?
+  createdById   String
+  
+  warehouse    Warehouse          @relation(fields: [warehouseId], references: [id])
+  createdBy    User               @relation(fields: [createdById], references: [id])
+  adjustments  StockAdjustment[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("stocktakes")
+}
+
+// Chi tiết điều chỉnh từ kiểm kê
+model StockAdjustment {
+  id              String   @id @default(cuid())
+  stocktakeId     String
+  productId       String
+  systemQuantity  Int      // Tồn theo hệ thống
+  actualQuantity  Int      // Tồn thực tế đếm được
+  difference      Int      // Chênh lệch
+  reason          String?
+  createdById     String
+  
+  stocktake Stocktake @relation(fields: [stocktakeId], references: [id], onDelete: Cascade)
+  product   Product   @relation(fields: [productId], references: [id])
+  createdBy User      @relation(fields: [createdById], references: [id])
+
+  createdAt DateTime @default(now())
+
+  @@map("stock_adjustments")
+}
+
+// ===========================
+// PURCHASING MODULE
+// ===========================
+
+model Supplier {
+  id             String  @id @default(cuid())
+  code           String  @unique
+  name           String
+  contactPerson  String?
+  phone          String?
+  email          String?
+  address        String?
+  taxCode        String?
+  bankAccount    String?
+  notes          String?
+  isActive       Boolean @default(true)
+  
+  purchaseOrders    PurchaseOrder[]
+  accountsPayable   AccountPayable[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("suppliers")
+}
+
+enum POStatus {
+  DRAFT      // Nháp
+  PENDING    // Chờ duyệt
+  APPROVED   // Đã duyệt
+  PARTIAL    // Nhập một phần
+  COMPLETED  // Hoàn thành
+  CANCELLED  // Hủy
+}
+
+model PurchaseOrder {
+  id            String    @id @default(cuid())
+  code          String    @unique
+  supplierId    String
+  warehouseId   String
+  status        POStatus  @default(DRAFT)
+  orderDate     DateTime  @default(now())
+  expectedDate  DateTime?
+  totalAmount   Decimal   @default(0) @db.Decimal(15, 2)
+  notes         String?
+  createdById   String
+  approvedById  String?
+  approvedAt    DateTime?
+  
+  supplier       Supplier           @relation(fields: [supplierId], references: [id])
+  warehouse      Warehouse          @relation(fields: [warehouseId], references: [id])
+  createdBy      User               @relation(fields: [createdById], references: [id])
+  
+  items          PurchaseOrderItem[]
+  goodsReceipts  GoodsReceipt[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("purchase_orders")
+}
+
+model PurchaseOrderItem {
+  id              String  @id @default(cuid())
+  purchaseOrderId String
+  productId       String
+  unitId          String
+  quantity        Int
+  unitPrice       Decimal @db.Decimal(15, 2)
+  totalPrice      Decimal @db.Decimal(15, 2)
+  receivedQty     Int     @default(0) // Đã nhập bao nhiêu
+  
+  purchaseOrder PurchaseOrder @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
+  product       Product       @relation(fields: [productId], references: [id])
+  unit          UnitOfMeasure @relation(fields: [unitId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("purchase_order_items")
+}
+
+enum GRStatus {
+  DRAFT
+  COMPLETED
+  CANCELLED
+}
+
+// Phiếu nhập kho
+model GoodsReceipt {
+  id              String    @id @default(cuid())
+  code            String    @unique
+  purchaseOrderId String?
+  warehouseId     String
+  supplierId      String?
+  status          GRStatus  @default(DRAFT)
+  receiptDate     DateTime  @default(now())
+  totalAmount     Decimal   @default(0) @db.Decimal(15, 2)
+  notes           String?
+  createdById     String
+  
+  purchaseOrder PurchaseOrder?      @relation(fields: [purchaseOrderId], references: [id])
+  warehouse     Warehouse           @relation(fields: [warehouseId], references: [id])
+  createdBy     User                @relation(fields: [createdById], references: [id])
+  
+  items         GoodsReceiptItem[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("goods_receipts")
+}
+
+model GoodsReceiptItem {
+  id             String  @id @default(cuid())
+  goodsReceiptId String
+  productId      String
+  unitId         String
+  quantity       Int
+  unitPrice      Decimal @db.Decimal(15, 2)
+  totalPrice     Decimal @db.Decimal(15, 2)
+  
+  goodsReceipt GoodsReceipt  @relation(fields: [goodsReceiptId], references: [id], onDelete: Cascade)
+  product      Product       @relation(fields: [productId], references: [id])
+  unit         UnitOfMeasure @relation(fields: [unitId], references: [id])
+
+  createdAt DateTime @default(now())
+
+  @@map("goods_receipt_items")
+}
+
+// ===========================
+// SALES & POS MODULE
+// ===========================
+
+enum MembershipTier {
+  BRONZE
+  SILVER
+  GOLD
+  PLATINUM
+}
+
+model Customer {
+  id            String         @id @default(cuid())
+  code          String         @unique
+  fullName      String
+  phone         String?        @unique
+  email         String?
+  address       String?
+  dateOfBirth   DateTime?
+  membershipTier MembershipTier @default(BRONZE)
+  loyaltyPoints Int            @default(0)
+  totalSpent    Decimal        @default(0) @db.Decimal(15, 2)
+  isActive      Boolean        @default(true)
+  
+  salesOrders        SalesOrder[]
+  accountsReceivable AccountReceivable[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("customers")
+}
+
+enum SOStatus {
+  DRAFT
+  CONFIRMED
+  DELIVERING
+  COMPLETED
+  CANCELLED
+  RETURNED
+}
+
+enum PaymentMethod {
+  CASH
+  BANK_TRANSFER
+  CREDIT_CARD
+  E_WALLET
+}
+
+model SalesOrder {
+  id              String        @id @default(cuid())
+  code            String        @unique
+  customerId      String?
+  warehouseId     String
+  status          SOStatus      @default(DRAFT)
+  orderDate       DateTime      @default(now())
+  
+  // Totals
+  subtotal        Decimal       @default(0) @db.Decimal(15, 2)
+  discountAmount  Decimal       @default(0) @db.Decimal(15, 2)
+  taxAmount       Decimal       @default(0) @db.Decimal(15, 2)
+  totalAmount     Decimal       @default(0) @db.Decimal(15, 2)
+  
+  paymentMethod   PaymentMethod @default(CASH)
+  isPaid          Boolean       @default(false)
+  paidAmount      Decimal       @default(0) @db.Decimal(15, 2)
+  notes           String?
+  createdById     String
+  
+  customer  Customer?        @relation(fields: [customerId], references: [id])
+  warehouse Warehouse        @relation(fields: [warehouseId], references: [id])
+  createdBy User             @relation(fields: [createdById], references: [id])
+  
+  items     SalesOrderItem[]
+  payments  Payment[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("sales_orders")
+}
+
+model SalesOrderItem {
+  id            String  @id @default(cuid())
+  salesOrderId  String
+  productId     String
+  unitId        String
+  quantity      Int
+  unitPrice     Decimal @db.Decimal(15, 2)
+  discount      Decimal @default(0) @db.Decimal(15, 2)
+  totalPrice    Decimal @db.Decimal(15, 2)
+  unitCost      Decimal @default(0) @db.Decimal(15, 2) // COGS
+  
+  salesOrder SalesOrder    @relation(fields: [salesOrderId], references: [id], onDelete: Cascade)
+  product    Product       @relation(fields: [productId], references: [id])
+  unit       UnitOfMeasure @relation(fields: [unitId], references: [id])
+
+  createdAt DateTime @default(now())
+
+  @@map("sales_order_items")
+}
+
+model Payment {
+  id            String        @id @default(cuid())
+  salesOrderId  String
+  amount        Decimal       @db.Decimal(15, 2)
+  method        PaymentMethod
+  reference     String?       // Mã giao dịch/tham chiếu
+  notes         String?
+  
+  salesOrder SalesOrder @relation(fields: [salesOrderId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@map("payments")
+}
+
+// ===========================
+// FINANCE MODULE
+// ===========================
+
+enum CashEntryType {
+  CASH_IN
+  CASH_OUT
+}
+
+model CashEntry {
+  id          String        @id @default(cuid())
+  code        String        @unique
+  type        CashEntryType
+  amount      Decimal       @db.Decimal(15, 2)
+  description String
+  reference   String?       // Tham chiếu đến đơn hàng/phiếu
+  createdById String
+  
+  createdBy User @relation(fields: [createdById], references: [id])
+
+  createdAt DateTime @default(now())
+
+  @@map("cash_entries")
+}
+
+enum DebtStatus {
+  PENDING
+  PARTIAL
+  PAID
+  OVERDUE
+}
+
+model AccountReceivable {
+  id          String     @id @default(cuid())
+  customerId  String
+  invoiceCode String     @unique
+  totalAmount Decimal    @db.Decimal(15, 2)
+  paidAmount  Decimal    @default(0) @db.Decimal(15, 2)
+  status      DebtStatus @default(PENDING)
+  dueDate     DateTime?
+  notes       String?
+  
+  customer Customer @relation(fields: [customerId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("accounts_receivable")
+}
+
+model AccountPayable {
+  id          String     @id @default(cuid())
+  supplierId  String
+  invoiceCode String     @unique
+  totalAmount Decimal    @db.Decimal(15, 2)
+  paidAmount  Decimal    @default(0) @db.Decimal(15, 2)
+  status      DebtStatus @default(PENDING)
+  dueDate     DateTime?
+  notes       String?
+  
+  supplier Supplier @relation(fields: [supplierId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("accounts_payable")
+}
