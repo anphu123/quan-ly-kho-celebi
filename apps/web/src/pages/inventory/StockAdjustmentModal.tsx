@@ -1,12 +1,12 @@
 import { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { Loader2, Package, Warehouse, RotateCcw, X, Zap, Target, ShieldAlert, FileText, ChevronRight } from 'lucide-react';
-import { inventoryApi, type StockLevel } from '../../lib/api/inventory.api';
+import { Loader2, Package, Warehouse, RotateCcw, X, Zap, Target, ShieldAlert, FileText } from 'lucide-react';
+import { inventoryApi } from '../../lib/api/inventory.api';
 
 interface StockAdjustmentModalProps {
   isOpen: boolean;
   onClose: () => void;
-  stockItem?: StockLevel;
+  stockItem?: any;
 }
 
 export default function StockAdjustmentModal({
@@ -40,12 +40,10 @@ export default function StockAdjustmentModal({
     if (!stockItem || !newQuantity || !reason) return;
 
     adjustStockMutation.mutate({
-      productId: stockItem.productId,
-      warehouseId: stockItem.warehouseId,
-      newQuantity: Number(newQuantity),
-      reason,
-      notes: notes || undefined,
-    });
+      serialItemId: stockItem.id,
+      status: 'AVAILABLE' as any,
+      notes: `${reason} - ${notes}`,
+    } as any);
   };
 
   const handleClose = () => {
@@ -95,10 +93,10 @@ export default function StockAdjustmentModal({
               </div>
               <div className="flex-1 min-w-0">
                 <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 italic">Target Asset SKU</p>
-                <h3 className="text-xl font-[1000] text-slate-900 tracking-tight leading-tight mb-2 truncate">{stockItem.product.name}</h3>
+                <h3 className="text-xl font-[1000] text-slate-900 tracking-tight leading-none mb-2 truncate">{stockItem.productTemplate?.name || stockItem.product?.name}</h3>
                 <div className="flex flex-wrap items-center gap-2">
-                  <span className="px-3 py-1 bg-slate-900 text-indigo-400 rounded-xl font-mono text-[11px] font-black tracking-widest uppercase">{stockItem.product.sku}</span>
-                  <span className="px-3 py-1 bg-white border border-slate-200 text-slate-500 rounded-xl font-black text-[10px] uppercase tracking-widest">{stockItem.product.category.name}</span>
+                  <span className="px-3 py-1 bg-slate-900 text-indigo-400 rounded-xl font-mono text-[11px] font-black tracking-widest uppercase">{stockItem.productTemplate?.sku || stockItem.product?.sku}</span>
+                  <span className="px-3 py-1 bg-white border border-slate-200 text-slate-500 rounded-xl font-black text-[10px] uppercase tracking-widest">{stockItem.productTemplate?.category?.name || stockItem.product?.category?.name}</span>
                 </div>
               </div>
             </div>
@@ -112,7 +110,7 @@ export default function StockAdjustmentModal({
               </div>
               <div className="p-5 bg-white border border-slate-100 rounded-2xl">
                 <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Current Balance</p>
-                <p className="text-xl font-[1000] text-indigo-600 tracking-tighter leading-none">{stockItem.quantity.toLocaleString()} <span className="text-[10px] font-black text-slate-300 uppercase italic ml-1">{stockItem.product.baseUnit.symbol}</span></p>
+                <p className="text-xl font-[1000] text-indigo-600 tracking-tighter leading-none">1 <span className="text-[10px] font-black text-slate-300 uppercase italic ml-1">Cái</span></p>
               </div>
             </div>
           </div>

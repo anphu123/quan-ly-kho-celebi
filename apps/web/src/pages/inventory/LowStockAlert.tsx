@@ -48,11 +48,11 @@ export default function LowStockAlert() {
           </h3>
         </div>
       </div>
-      
+
       <div className="card-body max-h-64 overflow-y-auto">
         <div className="space-y-3">
-          {lowStockProducts.map((item) => (
-            <div 
+          {lowStockProducts.map((item: any) => (
+            <div
               key={`${item.productId}-${item.warehouseId}`}
               className="flex items-center justify-between p-3 bg-white border border-red-200 rounded-lg"
             >
@@ -60,7 +60,7 @@ export default function LowStockAlert() {
                 <div className="p-2 bg-red-100 rounded-lg">
                   <Package className="w-4 h-4 text-red-600" />
                 </div>
-                
+
                 <div className="flex-1">
                   <div className="font-medium text-gray-900">
                     {item.product.name}
@@ -74,7 +74,7 @@ export default function LowStockAlert() {
                   </div>
                 </div>
               </div>
-              
+
               <div className="text-right">
                 <div className="flex items-center gap-2 mb-1">
                   <TrendingDown className="w-4 h-4 text-red-500" />
@@ -89,7 +89,7 @@ export default function LowStockAlert() {
             </div>
           ))}
         </div>
-        
+
         <div className="mt-4 pt-3 border-t border-red-200">
           <button className="btn btn-danger btn-sm">
             <AlertTriangle className="w-4 h-4" />

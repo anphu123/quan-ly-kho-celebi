@@ -19,21 +19,21 @@ export interface InboundRequest {
   totalActualValue?: number;
   notes?: string;
   receivedById?: string;
-  
+
   warehouse: {
     id: string;
     code: string;
     name: string;
   };
-  
+
   receivedBy?: {
     id: string;
     fullName: string;
     email: string;
   };
-  
+
   items: InboundItem[];
-  
+
   createdAt: string;
   updatedAt: string;
 }
@@ -49,28 +49,47 @@ export interface InboundItem {
   condition?: string;
   estimatedValue?: number;
   notes?: string;
+  sourceCustomerName?: string;
+  sourceCustomerPhone?: string;
+  sourceCustomerAddress?: string;
+  sourceCustomerIdCard?: string;
+  idCardIssueDate?: string;
+  idCardIssuePlace?: string;
+  bankAccount?: string;
+  bankName?: string;
+  contractNumber?: string;
+  purchaseDate?: string;
+  employeeName?: string;
+  otherCosts?: number;
+  topUp?: number;
+  repairCost?: number;
+  imageUrl?: string;
+  deviceImages?: string;   // JSON array string
+  cccdFrontUrl?: string;
+  cccdBackUrl?: string;
+
   isReceived: boolean;
   receivedAt?: string;
   serialItemId?: string;
-  
+
   category: {
     id: string;
     name: string;
     code: string;
   };
-  
+
   brand?: {
     id: string;
     name: string;
     code: string;
   };
-  
+
   productTemplate?: {
     id: string;
     sku: string;
     name: string;
   };
-  
+
   serialItem?: {
     id: string;
     serialNumber?: string;
@@ -100,6 +119,24 @@ export interface CreateInboundItem {
   condition?: string;
   estimatedValue?: number;
   notes?: string;
+  sourceCustomerName?: string;
+  sourceCustomerPhone?: string;
+  sourceCustomerAddress?: string;
+  sourceCustomerIdCard?: string;
+  idCardIssueDate?: string;
+  idCardIssuePlace?: string;
+  bankAccount?: string;
+  bankName?: string;
+  contractNumber?: string;
+  purchaseDate?: string;
+  employeeName?: string;
+  otherCosts?: number;
+  topUp?: number;
+  repairCost?: number;
+  imageUrl?: string;
+  deviceImages?: string;
+  cccdFrontUrl?: string;
+  cccdBackUrl?: string;
 }
 
 export interface ReceiveItem {
@@ -109,6 +146,7 @@ export interface ReceiveItem {
   purchasePrice: number;
   binLocation?: string;
   notes?: string;
+  customAttributes?: Array<{ attributeId: string; value: any }>;
 }
 
 export interface CompleteInbound {
@@ -154,7 +192,7 @@ export const inboundApi = {
   // ===========================
   // INBOUND REQUESTS
   // ===========================
-  
+
   async createRequest(data: CreateInboundRequest): Promise<InboundRequest> {
     const response = await api.post('/inbound/requests', data);
     return response.data;
@@ -162,14 +200,14 @@ export const inboundApi = {
 
   async getAllRequests(query?: InboundQuery): Promise<PaginatedResponse<InboundRequest>> {
     const params = new URLSearchParams();
-    
+
     if (query?.status) params.append('status', query.status);
     if (query?.supplierType) params.append('supplierType', query.supplierType);
     if (query?.warehouseId) params.append('warehouseId', query.warehouseId);
     if (query?.search) params.append('search', query.search);
     if (query?.page) params.append('page', query.page.toString());
     if (query?.limit) params.append('limit', query.limit.toString());
-    
+
     const response = await api.get(`/inbound/requests?${params.toString()}`);
     return response.data;
   },
@@ -257,7 +295,7 @@ export const inboundApi = {
   getStatusColor(status: string): string {
     const colors = {
       REQUESTED: 'bg-blue-100 text-blue-800',
-      IN_PROGRESS: 'bg-yellow-100 text-yellow-800', 
+      IN_PROGRESS: 'bg-yellow-100 text-yellow-800',
       COMPLETED: 'bg-green-100 text-green-800',
       CANCELLED: 'bg-red-100 text-red-800',
     };
@@ -293,7 +331,7 @@ export const inboundApi = {
     if (!date) return '--';
     return new Date(date).toLocaleDateString('vi-VN', {
       day: '2-digit',
-      month: '2-digit', 
+      month: '2-digit',
       year: 'numeric',
       hour: '2-digit',
       minute: '2-digit'

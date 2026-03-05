@@ -8,26 +8,22 @@ async function main() {
 
   // Clear existing data (in reverse dependency order)
   console.log('🧹 Clearing existing data...')
-  await prisma.qCInspectionItem.deleteMany()
-  await prisma.qCInspection.deleteMany()
-  await prisma.serialTransaction.deleteMany()
-  await prisma.dynamicSpec.deleteMany()
-  await prisma.salesOrderItem.deleteMany()
-  await prisma.salesOrder.deleteMany()
-  await prisma.customer.deleteMany()
-  await prisma.refurbishmentJob.deleteMany()
-  await prisma.serialItem.deleteMany()
-  await prisma.qCCheckItem.deleteMany()
-  await prisma.qCTemplate.deleteMany()
-  await prisma.productSpec.deleteMany()
-  await prisma.productTemplate.deleteMany()
-  await prisma.binLocation.deleteMany()
-  await prisma.warehouse.deleteMany()
-  await prisma.attribute.deleteMany()
-  await prisma.attributeGroup.deleteMany()
-  await prisma.brand.deleteMany()
-  await prisma.category.deleteMany()
-  await prisma.user.deleteMany()
+
+  const tableNames = [
+    'serial_transactions', 'sales_order_items', 'sales_orders',
+    'trade_in_items', 'suppliers', 'customers',
+    'dynamic_specs', 'product_specs', 'serial_items', 'bin_locations',
+    'product_templates', 'attributes', 'attribute_groups',
+    'qc_check_items', 'qc_templates', 'categories', 'brands',
+    'warehouses', 'users'
+  ];
+  for (const tableName of tableNames) {
+    try {
+      await prisma.$executeRawUnsafe(`TRUNCATE TABLE "${tableName}" CASCADE;`);
+    } catch (e) {
+      // Ignore if table doesn't exist
+    }
+  }
 
   console.log('✅ Existing data cleared')
 
@@ -62,6 +58,17 @@ async function main() {
       password: techPassword, // Tech@123 properly hashed
       fullName: 'Trần Văn Sửa',
       role: 'TECHNICIAN',
+    },
+  })
+
+  // Create Cashier
+  const cashierPassword = await bcrypt.hash('Cashier@123', 10)
+  const cashier = await prisma.user.create({
+    data: {
+      email: 'cashier@celebi.com',
+      password: cashierPassword,
+      fullName: 'Phạm Thu Ngân',
+      role: 'CASHIER',
     },
   })
 
@@ -133,7 +140,7 @@ async function main() {
     data: {
       attributeGroupId: hardwareGroup.id,
       key: 'ram_gb',
-      name: 'RAM (GB)', 
+      name: 'RAM (GB)',
       type: 'NUMBER',
       isRequired: true,
       minValue: 1,
@@ -212,7 +219,7 @@ async function main() {
       // iPhone 15 Pro specs
       { productTemplateId: iPhone15Pro.id, attributeId: ramAttribute.id, value: 8 },
       { productTemplateId: iPhone15Pro.id, attributeId: storageAttribute.id, value: '256' },
-      
+
       // Samsung S23 specs
       { productTemplateId: samsungS23.id, attributeId: ramAttribute.id, value: 8 },
       { productTemplateId: samsungS23.id, attributeId: storageAttribute.id, value: '256' },
@@ -481,134 +488,76 @@ async function main() {
   })
 
   // ===========================
-  // INBOUND TEST DATA ⭐ NEW
+  // SALES ORDER TEST DATA ⭐ NEW
   // ===========================
 
-  // Create sample inbound requests for testing
-  const inboundRequest1 = await prisma.inboundRequest.create({
+  const salesOrder1 = await prisma.salesOrder.create({
     data: {
-      code: 'INB-202403-001',
+      code: 'SO-202403-001',
+      customerId: customer.id,
       warehouseId: mainWarehouse.id,
-      status: 'REQUESTED',
-      supplierType: 'CUSTOMER_TRADE_IN',
-      supplierName: 'Nguyễn Văn Khách',
-      supplierPhone: '0901234567',
-      supplierEmail: 'khach.nguyen@email.com',
-      expectedDate: new Date('2024-03-04'),
-      totalEstimatedValue: 35000000, // 35 triệu
-      notes: 'Khách hàng đổi cũ lấy mới iPhone và Samsung',
-    },
-  })
-
-  const inboundRequest2 = await prisma.inboundRequest.create({
-    data: {
-      code: 'INB-202403-002',
-      warehouseId: mainWarehouse.id,
-      status: 'IN_PROGRESS',
-      supplierType: 'LIQUIDATION',
-      supplierName: 'Công ty ABC Electronics',
-      supplierPhone: '0246789123',
-      supplierEmail: 'liquidation@abc-electronics.com',
-      expectedDate: new Date('2024-03-03'),
-      receivedDate: new Date(),
-      totalEstimatedValue: 60000000, // 60 triệu
-      notes: 'Thanh lý thiết bị công ty - lô hàng lớn',
-      receivedById: admin.id,
-    },
-  })
-
-  const inboundRequest3 = await prisma.inboundRequest.create({
-    data: {
-      code: 'INB-202403-003',
-      warehouseId: mainWarehouse.id,
+      salesPersonId: cashier.id,
       status: 'COMPLETED',
-      supplierType: 'INDIVIDUAL_SELLER',
-      supplierName: 'Trần Thị Bán',
-      supplierPhone: '0987654321',
-      expectedDate: new Date('2024-03-01'),
-      receivedDate: new Date('2024-03-01'),
-      totalEstimatedValue: 15000000, // 15 triệu
-      totalActualValue: 14000000,   // 14 triệu thực tế
-      notes: 'Nhận Samsung cũ từ cá nhân',
-      receivedById: admin.id,
-    },
+      totalAmount: 26000000,
+      paidAmount: 26000000,
+      notes: 'Khách hàng thân thiết',
+      items: {
+        create: [
+          {
+            serialItemId: iphone2.id,
+            unitPrice: 26000000,
+            discount: 0,
+            finalPrice: 26000000,
+          }
+        ]
+      }
+    }
   })
 
-  // Create inbound items
-  await prisma.inboundItem.createMany({
-    data: [
-      // Request 1 items (REQUESTED)
-      {
-        inboundRequestId: inboundRequest1.id,
-        categoryId: smartphoneCategory.id,
-        brandId: apple.id,
-        modelName: 'iPhone 14 Pro 128GB',
-        serialNumber: '359987654321098',
-        condition: 'Tốt',
-        estimatedValue: 20000000,
-        notes: 'Máy đẹp, có hộp',
-        isReceived: false,
-      },
-      {
-        inboundRequestId: inboundRequest1.id,
-        categoryId: smartphoneCategory.id,
-        brandId: samsung.id,
-        modelName: 'Samsung Galaxy S22 Ultra 256GB',
-        condition: 'Khá',
-        estimatedValue: 15000000,
-        notes: 'Máy sử dụng ít, nhỏ trầy',
-        isReceived: false,
-      },
-      
-      // Request 2 items (IN_PROGRESS)
-      {
-        inboundRequestId: inboundRequest2.id,
-        categoryId: smartphoneCategory.id,
-        brandId: apple.id,
-        modelName: 'iPhone 13 Pro Max 256GB',
-        serialNumber: '359111222333444',
-        condition: 'Tốt',
-        estimatedValue: 18000000,
-        notes: 'Máy công ty, ít sử dụng',
-        isReceived: false,
-      },
-      {
-        inboundRequestId: inboundRequest2.id,
-        categoryId: smartphoneCategory.id,
-        brandId: samsung.id,
-        modelName: 'Samsung Galaxy Note 20 Ultra',
-        condition: 'Khá',
-        estimatedValue: 12000000,
-        notes: 'Pin chai nhẹ',
-        isReceived: false,
-      },
-      {
-        inboundRequestId: inboundRequest2.id,
-        categoryId: laptopCategory.id,
-        brandId: apple.id,
-        modelName: 'MacBook Pro 14" M1 Pro 512GB',
-        condition: 'Tốt',
-        estimatedValue: 30000000,
-        notes: 'Laptop công ty, còn bảo hành',
-        isReceived: false,
-      },
-      
-      // Request 3 items (COMPLETED - linked to existing serial item)
-      {
-        inboundRequestId: inboundRequest3.id,
-        categoryId: smartphoneCategory.id,
-        brandId: samsung.id,
-        productTemplateId: samsungS23.id,
-        modelName: 'Samsung Galaxy S23 256GB',
-        serialNumber: '351234567890123', // Same as samsung1 serial item
-        condition: 'Khá',
-        estimatedValue: 15000000,
-        notes: 'Pin 85%, máy đẹp',
-        isReceived: true,
-        receivedAt: new Date('2024-03-01T14:30:00'),
-        serialItemId: samsung1.id, // Link to created serial item
-      },
-    ],
+  // Cập nhật trạng thái serialItem sau khi bán
+  await prisma.serialItem.update({
+    where: { id: iphone2.id },
+    data: { status: 'SOLD' }
+  })
+
+  // Log transaction cho việc bán máy
+  await prisma.serialTransaction.create({
+    data: {
+      serialItemId: iphone2.id,
+      type: 'SOLD',
+      fromLocation: 'A-1-01',
+      toLocation: 'Customer',
+      fromStatus: 'AVAILABLE',
+      toStatus: 'SOLD',
+      performedById: cashier.id,
+      notes: 'Bán hàng cho khách ' + customer.fullName,
+      createdAt: new Date('2024-03-02T10:00:00')
+    }
+  })
+
+  // ===========================
+  // OUTBOUND TEST DATA ⭐ NEW
+  // ===========================
+
+  // Update samsung1 to simulate it being disposed
+  await prisma.serialItem.update({
+    where: { id: samsung1.id },
+    data: { status: 'DISPOSED' }
+  })
+
+  // Log transaction cho việc thanh lý máy
+  await prisma.serialTransaction.create({
+    data: {
+      serialItemId: samsung1.id,
+      type: 'DISPOSAL',
+      fromLocation: 'A-1-01',
+      toLocation: 'Disposed',
+      fromStatus: 'AVAILABLE',
+      toStatus: 'DISPOSED',
+      performedById: admin.id,
+      notes: 'Thanh lý máy do quá hạn',
+      createdAt: new Date('2024-03-03T09:00:00')
+    }
   })
 
   console.log('✅ Seeding completed!')
@@ -622,8 +571,7 @@ async function main() {
 - QC Template: 1 with 5 check items
 - Warehouse: 1 with 2 bin locations
 - Transactions: 4 movement records
-- Inbound Requests: 3 (1 Requested, 1 In Progress, 1 Completed)
-- Inbound Items: 6 (5 pending, 1 received)
+- Trade-In Items: 0
 
 🔧 Ready for Serial-Based Second-Hand Operations!
 `)

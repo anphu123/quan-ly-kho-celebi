@@ -1,5 +1,11 @@
 @import "tailwindcss";
 
+@layer base {
+  * {
+    box-sizing: border-box;
+  }
+}
+
 @theme {
   /* Font & Colors: Sử dụng hệ màu hiện đại, tương phản cao */
   --font-display: 'Manrope', 'Outfit', system-ui, sans-serif;

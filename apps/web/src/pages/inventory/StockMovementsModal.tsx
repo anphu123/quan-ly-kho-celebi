@@ -16,7 +16,7 @@ import {
   Clock,
   ArrowRight
 } from 'lucide-react';
-import { inventoryApi, type StockMovement } from '../../lib/api/inventory.api';
+import { inventoryApi } from '../../lib/api/inventory.api';
 
 interface StockMovementsModalProps {
   isOpen: boolean;
@@ -36,7 +36,7 @@ export default function StockMovementsModal({
 
   const { data: movementsData, isLoading, refetch } = useQuery({
     queryKey: ['inventory', 'stock-movements', { productId, warehouseId, page, limit }],
-    queryFn: () => inventoryApi.getStockMovements({ productId, warehouseId, page, limit }),
+    queryFn: () => (inventoryApi as any).getStockMovements({ productId, warehouseId, page, limit }),
     enabled: isOpen,
   });
 
@@ -49,7 +49,7 @@ export default function StockMovementsModal({
   const movements = movementsData?.data || [];
   const meta = movementsData?.meta;
 
-  const getMovementDisplay = (movement: StockMovement) => {
+  const getMovementDisplay = (movement: any) => {
     switch (movement.type) {
       case 'IN':
         return {
@@ -161,7 +161,7 @@ export default function StockMovementsModal({
             </div>
           ) : (
             <div className="space-y-6">
-              {movements.map((movement, idx) => {
+              {(movements as any[]).map((movement: any, idx: number) => {
                 const display = getMovementDisplay(movement);
                 const Icon = display.icon;
 

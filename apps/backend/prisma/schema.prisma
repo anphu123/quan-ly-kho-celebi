@@ -638,6 +638,29 @@ model SalesOrderItem {
 }
 
 // ===========================
+// SUPPLIER MANAGEMENT
+// ===========================
+
+model Supplier {
+  id            String   @id @default(cuid())
+  code          String   @unique // SUP-001
+  name          String   // Tên nhà cung cấp
+  contactPerson String?  // Người liên hệ
+  phone         String?
+  email         String?
+  address       String?
+  taxCode       String?  // Mã số thuế
+  bankAccount   String?  // Tài khoản ngân hàng
+  notes         String?
+  isActive      Boolean  @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("suppliers")
+}
+
+// ===========================
 // INBOUND/RECEIVING MODULE ⭐ NEW
 // ===========================
 
@@ -706,6 +729,28 @@ model InboundItem {
   // Initial assessment
   estimatedValue    Decimal?   @db.Decimal(15, 2) // Giá trị ước tính khi nhận
   notes             String?    // Ghi chú về tình trạng
+  
+  // Trade-in specific info (from Excel)
+  sourceCustomerName    String?  // TÊN KHÁCH HÀNG
+  sourceCustomerPhone   String?  // SỐ ĐIỆN THOẠI
+  sourceCustomerAddress String?  // ĐỊA CHỈ
+  sourceCustomerIdCard  String?  // CCCD SỐ
+  idCardIssueDate       DateTime?// Ngày cấp CCCD
+  idCardIssuePlace      String?  // Nơi cấp CCCD
+  bankAccount           String?  // SỐ TÀI KHOẢN CỦA KHÁCH
+  bankName              String?  // TẠI NGÂN HÀNG
+  
+  contractNumber        String?  // SỐ HỢP ĐỒNG
+  purchaseDate          DateTime?// NGÀY MUA
+  employeeName          String?  // TÊN NHÂN VIÊN
+  
+  otherCosts            Decimal? @db.Decimal(15, 2) // chi phí khác
+  topUp                 Decimal? @db.Decimal(15, 2) // TOP UP
+  repairCost            Decimal? @db.Decimal(15, 2) // GIÁ SỬA CHỮA
+  imageUrl              String?  // Hình ảnh thiết bị (ảnh chính)
+  deviceImages          String?  // JSON array các ảnh thiết bị
+  cccdFrontUrl          String?  // Ảnh CCCD mặt trước
+  cccdBackUrl           String?  // Ảnh CCCD mặt sau
   
   // Receiving details  
   isReceived        Boolean    @default(false)

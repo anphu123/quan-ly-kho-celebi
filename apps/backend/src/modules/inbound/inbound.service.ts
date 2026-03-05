@@ -1,17 +1,17 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '@/prisma/prisma.service';
-import { 
-  CreateInboundRequestDto, 
-  UpdateInboundRequestDto, 
-  CompleteInboundDto, 
+import {
+  CreateInboundRequestDto,
+  UpdateInboundRequestDto,
+  CompleteInboundDto,
   InboundQueryDto,
-  UpdateInboundItemDto 
+  UpdateInboundItemDto
 } from './dto/inbound.dto';
 import { InboundStatus, SerialStatus, TransactionType } from '@prisma/client';
 
 @Injectable()
 export class InboundService {
-  constructor(private prisma: PrismaService) {}
+  constructor(private prisma: PrismaService) { }
 
   // ===========================
   // INBOUND REQUEST OPERATIONS
@@ -28,6 +28,46 @@ export class InboundService {
 
     if (!warehouse) {
       throw new NotFoundException('Warehouse not found');
+    }
+
+    // Validate all categories exist
+    const categoryIds = [...new Set(dto.items.map(item => item.categoryId))];
+    const categories = await this.prisma.category.findMany({
+      where: { id: { in: categoryIds } },
+    });
+
+    if (categories.length !== categoryIds.length) {
+      const foundIds = categories.map(c => c.id);
+      const missingIds = categoryIds.filter(id => !foundIds.includes(id));
+      
+      // Get available categories to help user
+      const availableCategories = await this.prisma.category.findMany({
+        select: { id: true, name: true, code: true },
+        take: 10
+      });
+      
+      const suggestion = availableCategories.length > 0
+        ? `\n\nDanh mục khả dụng:\n${availableCategories.map(c => `- ${c.name} (${c.code}): ${c.id}`).join('\n')}`
+        : '\n\nKhông có danh mục nào trong hệ thống. Vui lòng chạy seed database.';
+      
+      throw new BadRequestException(
+        `Danh mục không tồn tại: ${missingIds.join(', ')}. ` +
+        `Vui lòng chọn danh mục từ dropdown hoặc làm mới trang để cập nhật dữ liệu.${suggestion}`
+      );
+    }
+
+    // Validate all brands exist (if provided)
+    const brandIds = [...new Set(dto.items.filter(item => item.brandId).map(item => item.brandId))];
+    if (brandIds.length > 0) {
+      const brands = await this.prisma.brand.findMany({
+        where: { id: { in: brandIds } },
+      });
+
+      if (brands.length !== brandIds.length) {
+        const foundIds = brands.map(b => b.id);
+        const missingIds = brandIds.filter(id => !foundIds.includes(id));
+        throw new BadRequestException(`Brands not found: ${missingIds.join(', ')}`);
+      }
     }
 
     // Create inbound request with items (userId can be used for audit trails later)
@@ -52,6 +92,20 @@ export class InboundService {
             condition: item.condition,
             estimatedValue: item.estimatedValue,
             notes: item.notes,
+            sourceCustomerName: item.sourceCustomerName,
+            sourceCustomerPhone: item.sourceCustomerPhone,
+            sourceCustomerAddress: item.sourceCustomerAddress,
+            sourceCustomerIdCard: item.sourceCustomerIdCard,
+            idCardIssueDate: item.idCardIssueDate ? new Date(item.idCardIssueDate) : null,
+            idCardIssuePlace: item.idCardIssuePlace,
+            bankAccount: item.bankAccount,
+            bankName: item.bankName,
+            contractNumber: item.contractNumber,
+            purchaseDate: item.purchaseDate ? new Date(item.purchaseDate) : null,
+            employeeName: item.employeeName,
+            otherCosts: item.otherCosts,
+            topUp: item.topUp,
+            repairCost: item.repairCost,
           })),
         },
       },
@@ -285,11 +339,18 @@ export class InboundService {
 
   async completeInboundRequest(dto: CompleteInboundDto, userId: string) {
     return this.prisma.$transaction(async (tx) => {
+      // Validate and get request
       const request = await tx.inboundRequest.findUnique({
         where: { id: dto.inboundRequestId },
         include: {
           warehouse: true,
-          items: true,
+          items: {
+            include: {
+              productTemplate: true,
+              category: true,
+              brand: true,
+            },
+          },
         },
       });
 
@@ -298,88 +359,183 @@ export class InboundService {
       }
 
       if (request.status !== InboundStatus.IN_PROGRESS) {
-        throw new BadRequestException('Inbound request is not in progress');
+        throw new BadRequestException('Inbound request must be in IN_PROGRESS status');
       }
 
-      // Create SerialItems for received items
+      // Validate items exist and not already received
+      const itemsToProcess = new Map();
       for (const receiveItem of dto.items) {
-        const inboundItem = await tx.inboundItem.findUnique({
-          where: { id: receiveItem.inboundItemId },
-          include: { productTemplate: true },
-        });
-
+        const inboundItem = request.items.find(item => item.id === receiveItem.inboundItemId);
         if (!inboundItem) {
-          throw new NotFoundException(`Inbound item ${receiveItem.inboundItemId} not found`);
+          throw new NotFoundException(`Inbound item ${receiveItem.inboundItemId} not found in this request`);
+        }
+        if (inboundItem.isReceived) {
+          throw new BadRequestException(`Item ${receiveItem.inboundItemId} is already received`);
         }
 
-        // Generate internal code if no serial number
-        const internalCode = receiveItem.serialNumber || await this.generateInternalCode(tx);
+        // Validate purchase price
+        if (!receiveItem.purchasePrice || receiveItem.purchasePrice <= 0) {
+          throw new BadRequestException(`Invalid purchase price for item ${receiveItem.inboundItemId}`);
+        }
 
-        // Create SerialItem
-        const serialItem = await tx.serialItem.create({
-          data: {
-            productTemplateId: inboundItem.productTemplateId || await this.createProductTemplate(tx, inboundItem),
-            serialNumber: receiveItem.serialNumber,
-            internalCode,
-            source: `Inbound-${request.code}`,
-            purchasePrice: receiveItem.purchasePrice,
-            purchaseDate: new Date(),
-            purchaseBatch: request.code,
-            status: SerialStatus.INCOMING,
-            conditionNotes: receiveItem.condition || inboundItem.condition,
-            currentCostPrice: receiveItem.purchasePrice,
-            warehouseId: request.warehouseId,
-            binLocation: receiveItem.binLocation,
-          },
-        });
+        // Validate decimal precision (max 15,2)
+        const priceString = receiveItem.purchasePrice.toString();
+        const decimalIndex = priceString.indexOf('.');
+        if (decimalIndex !== -1) {
+          const decimalPart = priceString.substring(decimalIndex + 1);
+          if (decimalPart.length > 2) {
+            throw new BadRequestException(`Purchase price for item ${receiveItem.inboundItemId} has too many decimal places (max 2)`);
+          }
+        }
 
-        // Update inbound item
-        await tx.inboundItem.update({
-          where: { id: receiveItem.inboundItemId },
-          data: {
-            isReceived: true,
-            receivedAt: new Date(),
-            serialItemId: serialItem.id,
-            condition: receiveItem.condition || inboundItem.condition,
-            notes: receiveItem.notes || inboundItem.notes,
-          },
-        });
-
-        // Create transaction record
-        await tx.serialTransaction.create({
-          data: {
-            serialItemId: serialItem.id,
-            type: TransactionType.INBOUND,
-            toLocation: receiveItem.binLocation,
-            toStatus: SerialStatus.INCOMING,
-            costChange: receiveItem.purchasePrice,
-            notes: `Received via inbound ${request.code}`,
-            performedById: userId,
-          },
-        });
+        itemsToProcess.set(receiveItem.inboundItemId, { inboundItem, receiveItem });
       }
 
+      const serialItemsCreated = [];
+
+      // Process each item
+      for (const [_itemId, { inboundItem, receiveItem }] of itemsToProcess) {
+        // Generate internal code if no serial number provided
+        let internalCode = receiveItem.serialNumber;
+        if (!internalCode) {
+          internalCode = await this.generateInternalCode(tx);
+        }
+
+        // Validate serial/internal code uniqueness
+        const existingSerial = await tx.serialItem.findFirst({
+          where: {
+            OR: [
+              { serialNumber: receiveItem.serialNumber ? receiveItem.serialNumber : undefined },
+              { internalCode },
+            ],
+          },
+        });
+
+        if (existingSerial) {
+          throw new BadRequestException(`Serial number or internal code already exists: ${receiveItem.serialNumber || internalCode}`);
+        }
+
+        // Ensure product template exists
+        let productTemplateId = inboundItem.productTemplateId;
+        if (!productTemplateId) {
+          productTemplateId = await this.createProductTemplate(tx, inboundItem);
+        }
+
+        // Create SerialItem with proper error handling
+        try {
+          const serialItem = await tx.serialItem.create({
+            data: {
+              productTemplateId,
+              serialNumber: receiveItem.serialNumber || null,
+              internalCode,
+              source: `Inbound-${request.code}`,
+              purchasePrice: Number(receiveItem.purchasePrice),
+              purchaseDate: new Date(),
+              purchaseBatch: request.code,
+              status: SerialStatus.INCOMING,
+              conditionNotes: receiveItem.condition || inboundItem.condition,
+              currentCostPrice: Number(receiveItem.purchasePrice),
+              warehouseId: request.warehouseId,
+              binLocation: receiveItem.binLocation || null,
+            },
+          });
+
+          serialItemsCreated.push(serialItem);
+
+          // Save custom dynamic attributes if provided
+          if (receiveItem.customAttributes?.length > 0) {
+            await tx.dynamicSpec.createMany({
+              data: receiveItem.customAttributes.map(attr => ({
+                serialItemId: serialItem.id,
+                attributeId: attr.attributeId,
+                value: attr.value,
+                recordedById: userId,
+              })),
+            });
+          }
+
+          // Update inbound item
+          await tx.inboundItem.update({
+            where: { id: receiveItem.inboundItemId },
+            data: {
+              isReceived: true,
+              receivedAt: new Date(),
+              serialItemId: serialItem.id,
+              condition: receiveItem.condition || inboundItem.condition,
+              notes: receiveItem.notes || inboundItem.notes,
+            },
+          });
+
+          // Create transaction record
+          await tx.serialTransaction.create({
+            data: {
+              serialItemId: serialItem.id,
+              type: TransactionType.INBOUND,
+              fromStatus: null,
+              toStatus: SerialStatus.INCOMING,
+              fromLocation: null,
+              toLocation: receiveItem.binLocation,
+              costChange: Number(receiveItem.purchasePrice),
+              notes: `Received via inbound ${request.code} - ${receiveItem.condition || 'No condition notes'}`,
+              performedById: userId,
+            },
+          });
+
+        } catch (error: any) {
+          console.error(`Error creating serial item for inbound item ${receiveItem.inboundItemId}:`, {
+            itemId: receiveItem.inboundItemId,
+            modelName: inboundItem.modelName,
+            serialNumber: receiveItem.serialNumber,
+            internalCode,
+            purchasePrice: receiveItem.purchasePrice,
+            error: error.message,
+            stack: error.stack
+          });
+          throw new BadRequestException(
+            `Failed to create serial item for ${inboundItem.modelName} (${receiveItem.inboundItemId}): ${error.message}`
+          );
+        }
+      }
+
+      // Calculate total actual value from processed items
+      const calculatedTotalValue = serialItemsCreated.reduce((sum, item) => sum + Number(item.purchasePrice), 0);
+
       // Complete the inbound request
-      return tx.inboundRequest.update({
+      const updatedRequest = await tx.inboundRequest.update({
         where: { id: dto.inboundRequestId },
         data: {
           status: InboundStatus.COMPLETED,
           receivedDate: new Date(),
-          totalActualValue: dto.totalActualValue,
+          receivedById: userId,
+          totalActualValue: dto.totalActualValue || calculatedTotalValue,
           notes: dto.notes || request.notes,
         },
         include: {
           warehouse: true,
-          receivedBy: { select: { id: true, fullName: true } },
+          receivedBy: { select: { id: true, fullName: true, email: true } },
           items: {
             include: {
               category: true,
               brand: true,
-              serialItem: true,
+              productTemplate: true,
+              serialItem: {
+                include: {
+                  productTemplate: true,
+                },
+              },
             },
           },
         },
       });
+
+      return {
+        ...updatedRequest,
+        summary: {
+          totalItemsReceived: serialItemsCreated.length,
+          totalValue: calculatedTotalValue,
+          message: `Successfully received ${serialItemsCreated.length} items with total value ${calculatedTotalValue}`,
+        },
+      };
     });
   }
 
@@ -447,13 +603,13 @@ export class InboundService {
       totalValueReceived,
     ] = await Promise.all([
       this.prisma.inboundRequest.count({ where }),
-      this.prisma.inboundRequest.count({ 
+      this.prisma.inboundRequest.count({
         where: { ...where, status: InboundStatus.REQUESTED },
       }),
-      this.prisma.inboundRequest.count({ 
+      this.prisma.inboundRequest.count({
         where: { ...where, status: InboundStatus.IN_PROGRESS },
       }),
-      this.prisma.inboundRequest.count({ 
+      this.prisma.inboundRequest.count({
         where: { ...where, status: InboundStatus.COMPLETED },
       }),
       this.prisma.inboundItem.count({
@@ -472,7 +628,7 @@ export class InboundService {
 
     return {
       totalRequests,
-      pendingRequests, 
+      pendingRequests,
       inProgressRequests,
       completedRequests,
       totalItemsReceived,

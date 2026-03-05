@@ -1,6 +1,34 @@
 import axios from 'axios';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:6868/api/v1';
+// Auto-detect API URL based on current host for LAN access
+const getApiUrl = () => {
+  const envUrl = import.meta.env.VITE_API_URL;
+  const hostname = window.location.hostname;
+
+  // Automatically replace localhost with actual LAN IP if accessed via network
+  if (envUrl && (envUrl.includes('localhost') || envUrl.includes('127.0.0.1'))) {
+    if (hostname !== 'localhost' && hostname !== '127.0.0.1') {
+      const url = envUrl.replace(/localhost|127\.0\.0\.1/, hostname);
+      console.log('🌐 API URL (LAN Override):', url);
+      return url;
+    }
+  }
+
+  // Use env variable if explicitly set
+  if (envUrl) {
+    console.log('🔧 Using API URL from env:', envUrl);
+    return envUrl;
+  }
+
+  // Fallback
+  const port = 6868;
+  const url = `http://${hostname}:${port}/api/v1`;
+  console.log('🌐 API URL (Fallback):', url);
+  return url;
+};
+
+const API_URL = getApiUrl();
+console.log('✅ Final API Base URL:', API_URL);
 
 export const api = axios.create({
   baseURL: API_URL,

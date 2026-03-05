@@ -1,73 +1,60 @@
 import api from '../api';
 
-// Types
-export interface StockLevel {
+// Types - Serial-based system
+export type SerialStatus =
+  | 'INCOMING'
+  | 'QC_IN_PROGRESS'
+  | 'AVAILABLE'
+  | 'RESERVED'
+  | 'SOLD'
+  | 'REFURBISHING'
+  | 'DAMAGED'
+  | 'RETURNED'
+  | 'DISPOSED';
+
+export type SerialGrade =
+  | 'GRADE_A_NEW'
+  | 'GRADE_A'
+  | 'GRADE_B_PLUS'
+  | 'GRADE_B'
+  | 'GRADE_C_PLUS'
+  | 'GRADE_C'
+  | 'GRADE_D';
+
+export interface SerialItem {
   id: string;
-  productId: string;
+  productTemplateId: string;
+  serialNumber: string | null;
+  internalCode: string;
+  source: string | null;
+  purchasePrice: number;
+  purchaseDate: string | null;
+  purchaseBatch: string | null;
+  status: SerialStatus;
+  grade: SerialGrade | null;
+  conditionNotes: string | null;
+  currentCostPrice: number;
+  suggestedPrice: number;
   warehouseId: string;
-  quantity: number;
-  reservedQuantity: number;
-  availableQuantity: number;
-  minStockLevel: number;
-  maxStockLevel?: number;
-  reorderPoint?: number;
-  isTracked: boolean;
-  updatedAt: string;
-  product: {
+  binLocation: string | null;
+  productTemplate: {
     id: string;
     name: string;
     sku: string;
-    category: {
-      id: string;
-      name: string;
-    };
-    brand: {
-      id: string;
-      name: string;
-    };
-    baseUnit: {
-      id: string;
-      name: string;
-      symbol: string;
-    };
+    category: { id: string; name: string };
+    brand: { id: string; name: string };
   };
   warehouse: {
     id: string;
     name: string;
     code: string;
   };
-}
-
-export interface StockMovement {
-  id: string;
-  productId: string;
-  warehouseId: string;
-  type: 'IN' | 'OUT' | 'ADJUSTMENT' | 'TRANSFER';
-  quantity: number;
-  previousQuantity: number;
-  newQuantity: number;
-  reason?: string;
-  referenceId?: string;
-  referenceType?: string;
-  notes?: string;
   createdAt: string;
-  createdById: string;
-  product: {
-    name: string;
-    sku: string;
-  };
-  warehouse: {
-    name: string;
-    code: string;
-  };
-  createdBy: {
-    fullName: string;
-    email: string;
-  };
+  updatedAt: string;
 }
 
-export interface StockMovementsResponse {
-  data: StockMovement[];
+export interface SerialItemsResponse {
+  data: SerialItem[];
   meta: {
     total: number;
     page: number;
@@ -76,75 +63,106 @@ export interface StockMovementsResponse {
   };
 }
 
-export interface StockAdjustmentDto {
-  productId: string;
-  warehouseId: string;
-  newQuantity: number;
-  reason: string;
-  notes?: string;
+export interface SerialItemStats {
+  totalItems: number;
+  byStatus: Record<SerialStatus, number>;
+  byGrade: Record<string, number>;
+  totalCostValue: number;
+  totalSuggestedValue: number;
+  averageCostPrice: number;
+  averageSuggestedPrice: number;
 }
 
-export interface ProductInventory {
-  productId: string;
-  product: {
-    id: string;
-    name: string;
-    sku: string;
-  };
-  stockLevels: Array<{
-    warehouseId: string;
-    warehouse: {
-      name: string;
-      code: string;
-    };
-    quantity: number;
-    availableQuantity: number;
-    reservedQuantity: number;
-    minStockLevel: number;
-  }>;
-  totalQuantity: number;
-  totalAvailable: number;
-  totalReserved: number;
+// Keep legacy type alias for backwards compat with InventoryPage
+export type StockLevel = SerialItem;
+
+export interface StockAdjustmentDto {
+  serialItemId: string;
+  status: SerialStatus;
+  notes?: string;
+  binLocation?: string;
 }
+
+export const STATUS_LABELS: Record<SerialStatus, string> = {
+  INCOMING: 'Mới nhập (Chờ QC)',
+  QC_IN_PROGRESS: 'Đang kiểm định',
+  AVAILABLE: 'Sẵn sàng bán',
+  RESERVED: 'Đã đặt cọc',
+  SOLD: 'Đã bán',
+  REFURBISHING: 'Đang sửa chữa',
+  DAMAGED: 'Hỏng',
+  RETURNED: 'Hàng trả về',
+  DISPOSED: 'Đã thanh lý',
+};
+
+export const IN_STOCK_STATUSES: SerialStatus[] = [
+  'INCOMING',
+  'QC_IN_PROGRESS',
+  'AVAILABLE',
+  'RESERVED',
+  'REFURBISHING',
+];
 
 // API Functions
 export const inventoryApi = {
-  // Get stock levels
-  getStockLevels: async (params?: { 
-    warehouseId?: string; 
-    productId?: string; 
-  }) => {
-    const { data } = await api.get<StockLevel[]>('/inventory/stock-levels', { params });
-    return data;
-  },
-
-  // Get stock movements with pagination
-  getStockMovements: async (params?: {
-    productId?: string;
+  // Get all serial items (= tồn kho)
+  getStockLevels: async (params?: {
     warehouseId?: string;
+    productId?: string;
+    status?: SerialStatus;
+    search?: string;
     page?: number;
     limit?: number;
   }) => {
-    const { data } = await api.get<StockMovementsResponse>('/inventory/stock-movements', { params });
+    // Map to serial-items API, filter to in-stock statuses by default
+    const { data } = await api.get<SerialItemsResponse>('/serial-items', {
+      params: {
+        ...params,
+        limit: Math.min(params?.limit || 100, 100),
+      },
+    });
+    // Filter to in-stock items only (exclude SOLD, DISPOSED, DAMAGED)
+    const inStock = data.data.filter(item =>
+      IN_STOCK_STATUSES.includes(item.status)
+    );
+    return inStock;
+  },
+
+  // Get serial items with all filters (for advanced inventory view)
+  getAllSerialItems: async (params?: {
+    warehouseId?: string;
+    status?: SerialStatus;
+    search?: string;
+    page?: number;
+    limit?: number;
+  }) => {
+    const { data } = await api.get<SerialItemsResponse>('/serial-items', { params });
     return data;
   },
 
-  // Get low stock products
-  getLowStockProducts: async (warehouseId?: string) => {
-    const params = warehouseId ? { warehouseId } : undefined;
-    const { data } = await api.get<StockLevel[]>('/inventory/low-stock', { params });
+  // Get inventory stats
+  getStats: async (warehouseId?: string) => {
+    const { data } = await api.get<SerialItemStats>('/serial-items/stats', {
+      params: warehouseId ? { warehouseId } : undefined,
+    });
     return data;
   },
 
-  // Get inventory for specific product
-  getProductInventory: async (productId: string) => {
-    const { data } = await api.get<ProductInventory>(`/inventory/product/${productId}`);
-    return data;
+  // Get low stock / items needing attention (INCOMING items waiting QC)
+  getLowStockProducts: async (_warehouseId?: string) => {
+    const { data } = await api.get<SerialItemsResponse>('/serial-items', {
+      params: { status: 'INCOMING', limit: 50 },
+    });
+    return data.data;
   },
 
-  // Adjust stock manually
+  // Update serial item status (replaces adjustStock)
   adjustStock: async (dto: StockAdjustmentDto) => {
-    const { data } = await api.post('/inventory/adjust', dto);
+    const { data } = await api.put(`/serial-items/${dto.serialItemId}/status`, {
+      status: dto.status,
+      notes: dto.notes,
+      binLocation: dto.binLocation,
+    });
     return data;
   },
 };

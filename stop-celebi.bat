@@ -1,49 +1,33 @@
 @echo off
+setlocal EnableDelayedExpansion
 title CELEBI System - Stop Script
 color 0C
 
 echo.
 echo ============================================
-echo   STOPPING CELEBI WAREHOUSE SYSTEM        
+echo   STOPPING CELEBI WAREHOUSE SYSTEM
 echo ============================================
 echo.
 
-echo [1/3] Stopping Backend (port 6868)...
-for /f "tokens=5" %%a in ('netstat -ano ^| findstr :6868') do (
-    taskkill /PID %%a /F >nul 2>&1
-    if !errorlevel! equ 0 (
-        echo   ✓ Stopped backend process %%a
-    ) else (
-        echo   ✗ Failed to stop process %%a
-    )
-)
-
-echo.
-echo [2/3] Stopping Frontend (port 5173)...
-for /f "tokens=5" %%a in ('netstat -ano ^| findstr :5173') do (
-    taskkill /PID %%a /F >nul 2>&1
-    if !errorlevel! equ 0 (
-        echo   ✓ Stopped frontend process %%a
-    ) else (
-        echo   ✗ Failed to stop process %%a
-    )
-)
-
-echo.
-echo [3/3] Stopping all remaining Node.js processes...
+echo [1/2] Killing ALL Node.js processes...
 taskkill /IM node.exe /F >nul 2>&1
-if %errorlevel% equ 0 (
-    echo   ✓ All Node.js processes stopped
+if !errorlevel! equ 0 (
+    echo   OK - All Node.js processes killed
 ) else (
-    echo   ✓ No additional Node.js processes found
+    echo   OK - No Node.js processes found
+)
+
+echo.
+echo [2/2] Freeing ports 6868, 5173-5180...
+for %%p in (6868 5173 5174 5175 5176 5177 5178 5179 5180) do (
+    for /f "tokens=5" %%a in ('netstat -ano ^| findstr :%%p 2^>nul') do (
+        taskkill /PID %%a /F >nul 2>&1
+    )
 )
 
 echo.
 echo ============================================
-echo   CELEBI SYSTEM STOPPED SUCCESSFULLY      
+echo   CELEBI SYSTEM STOPPED
 echo ============================================
-echo.
-echo All services have been stopped.
-echo You can now run start-celebi.bat to restart the system.
 echo.
 pause

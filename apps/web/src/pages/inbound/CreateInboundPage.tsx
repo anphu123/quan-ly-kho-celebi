@@ -78,7 +78,22 @@ export default function CreateInboundPage() {
     if (Object.keys(errs).length > 0) { setErrors(errs); window.scrollTo({ top: 0, behavior: 'smooth' }); return; }
     try {
       setLoading(true);
-      await inboundApi.createRequest(formData);
+      const payload = {
+        ...formData,
+        totalEstimatedValue: total > 0 ? total : undefined,
+        expectedDate: formData.expectedDate || undefined,
+        supplierPhone: formData.supplierPhone || undefined,
+        supplierEmail: formData.supplierEmail || undefined,
+        notes: formData.notes || undefined,
+        items: formData.items.map(item => ({
+          ...item,
+          brandId: item.brandId || undefined,
+          serialNumber: item.serialNumber || undefined,
+          estimatedValue: (item.estimatedValue || 0) > 0 ? item.estimatedValue : undefined,
+          notes: item.notes || undefined,
+        })),
+      };
+      await inboundApi.createRequest(payload as any);
       navigate('/inbound', { state: { message: 'Tạo phiếu nhập kho thành công!' } });
     } catch (error: any) {
       setErrors({ general: error.response?.data?.message || 'Lỗi hệ thống khi khởi tạo phiếu' });

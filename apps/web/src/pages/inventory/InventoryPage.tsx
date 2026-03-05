@@ -2,40 +2,74 @@ import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   Package, Search, Loader2, AlertTriangle,
-  Filter, Database, Zap, Target,
-  TrendingDown, TrendingUp, X, RefreshCw, BarChart3, ArrowUpDown, BoxSelect
+  Database, Zap, Target,
+  TrendingDown, TrendingUp, X, BarChart3, ArrowUpDown,
+  BoxSelect, ShieldAlert
 } from 'lucide-react';
-import { inventoryApi, type StockLevel, type StockAdjustmentDto } from '../../lib/api/inventory.api';
+import {
+  inventoryApi,
+  type SerialItem,
+  type SerialStatus,
+  STATUS_LABELS,
+  IN_STOCK_STATUSES,
+} from '../../lib/api/inventory.api';
+
+const GRADE_LABELS: Record<string, string> = {
+  GRADE_A_NEW: 'A+ Mới',
+  GRADE_A: 'Grade A',
+  GRADE_B_PLUS: 'Grade B+',
+  GRADE_B: 'Grade B',
+  GRADE_C_PLUS: 'Grade C+',
+  GRADE_C: 'Grade C',
+  GRADE_D: 'Grade D',
+};
+
+const STATUS_COLORS: Record<SerialStatus, string> = {
+  INCOMING: 'ok',
+  QC_IN_PROGRESS: 'low',
+  AVAILABLE: 'ok',
+  RESERVED: 'low',
+  SOLD: 'none',
+  REFURBISHING: 'low',
+  DAMAGED: 'none',
+  RETURNED: 'low',
+  DISPOSED: 'none',
+};
 
 export default function InventoryPage() {
   const queryClient = useQueryClient();
   const [searchTerm, setSearchTerm] = useState('');
-  const [adjustmentModal, setAdjustmentModal] = useState<StockLevel | null>(null);
+  const [statusFilter, setStatusFilter] = useState<SerialStatus | ''>('');
+  const [adjustModal, setAdjustModal] = useState<SerialItem | null>(null);
 
-  const { data: stockLevels = [], isLoading } = useQuery({
-    queryKey: ['inventory', searchTerm],
-    queryFn: () => inventoryApi.getStockLevels({}),
+  const { data: serialItems = [], isLoading } = useQuery({
+    queryKey: ['inventory', searchTerm, statusFilter],
+    queryFn: () => inventoryApi.getStockLevels({
+      status: statusFilter || undefined,
+      search: searchTerm || undefined,
+      limit: 100,
+    }),
   });
 
-  const { data: lowStockItems = [] } = useQuery({
-    queryKey: ['low-stock'],
-    queryFn: () => inventoryApi.getLowStockProducts(),
+  const { data: stats } = useQuery({
+    queryKey: ['inventory-stats'],
+    queryFn: () => inventoryApi.getStats(),
   });
 
-  const filteredStock = stockLevels.filter(s =>
+  const filteredItems = serialItems.filter(item =>
     !searchTerm ||
-    s.product?.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    s.product?.sku.toLowerCase().includes(searchTerm.toLowerCase())
+    item.productTemplate?.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    item.serialNumber?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    item.internalCode?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const outOfStock = stockLevels.filter(s => s.quantity <= 0).length;
-  const lowStock = lowStockItems.length;
+  const available = stats?.byStatus?.['AVAILABLE'] || 0;
+  const incoming = stats?.byStatus?.['INCOMING'] || 0;
+  const inQC = stats?.byStatus?.['QC_IN_PROGRESS'] || 0;
+  const totalInStock = IN_STOCK_STATUSES.reduce((sum, s) => sum + (stats?.byStatus?.[s] || 0), 0);
 
-  const getStockStatus = (stock: StockLevel) => {
-    if (stock.quantity <= 0) return { label: 'Hết hàng', variant: 'none', icon: TrendingDown };
-    if (stock.quantity <= stock.minStockLevel) return { label: 'Cảnh báo', variant: 'low', icon: AlertTriangle };
-    return { label: 'Bình thường', variant: 'ok', icon: TrendingUp };
-  };
+  const formatCurrency = (val: number) =>
+    new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(val);
 
   return (
     <div className="animate-fade-in">
@@ -50,31 +84,24 @@ export default function InventoryPage() {
           </div>
           <h1 className="page-title">Tồn kho <span>Thực tế</span></h1>
           <p className="page-desc">
-            Giám sát mức tồn kho theo thời gian thực, nhận cảnh báo sắp hết và điều chỉnh nhanh.
+            Giám sát từng thiết bị theo Serial/IMEI — trạng thái, vị trí và giá vốn.
           </p>
         </div>
-        <button
-          className="page-action-btn"
-          onClick={() => setAdjustmentModal(filteredStock[0] || null)}
-        >
-          <ArrowUpDown size={18} />
-          Điều chỉnh tồn kho
-        </button>
       </div>
 
       {/* Stats */}
       <div className="page-stats-grid">
         {[
-          { label: 'Tổng SKU theo dõi', val: stockLevels.length, icon: BoxSelect, color: 'indigo', warn: false },
-          { label: 'Sắp hết hàng', val: lowStock, icon: TrendingDown, color: 'amber', warn: lowStock > 0 },
-          { label: 'Hết hàng', val: outOfStock, icon: AlertTriangle, color: 'rose', warn: outOfStock > 0 },
-          { label: 'Kho hoạt động', val: new Set(stockLevels.map(s => s.warehouseId)).size, icon: RefreshCw, color: 'emerald', warn: false },
+          { label: 'Tổng trong kho', val: totalInStock, icon: BoxSelect, color: 'indigo', warn: false },
+          { label: 'Mới nhập (Chờ QC)', val: incoming, icon: TrendingDown, color: 'amber', warn: incoming > 0 },
+          { label: 'Sẵn sàng bán', val: available, icon: TrendingUp, color: 'emerald', warn: false },
+          { label: 'Đang kiểm định', val: inQC, icon: ShieldAlert, color: 'purple', warn: false },
         ].map((s) => (
           <div key={s.label} className="page-stat-card">
             <div className={`page-stat-icon ${s.color}`}><s.icon size={20} /></div>
             <div>
               <p className="page-stat-label">{s.label}</p>
-              <p className={`page-stat-value${s.warn && s.color === 'amber' ? ' warn-amber' : s.warn && s.color === 'rose' ? ' warn-rose' : ''}`}>{s.val}</p>
+              <p className="page-stat-value">{s.val}</p>
             </div>
           </div>
         ))}
@@ -88,25 +115,37 @@ export default function InventoryPage() {
           <div className="table-toolbar-title-group">
             <div className="table-toolbar-icon"><Database size={18} /></div>
             <div>
-              <p className="table-toolbar-title">Danh sách tồn kho</p>
+              <p className="table-toolbar-title">Danh sách thiết bị trong kho</p>
               <p className="table-toolbar-count">
                 <Zap size={12} />
-                {filteredStock.length} / {stockLevels.length} bản ghi
+                {filteredItems.length} thiết bị
               </p>
             </div>
           </div>
-          <div style={{ display: 'flex', gap: '0.75rem', flex: 1, maxWidth: '24rem' }}>
+          <div style={{ display: 'flex', gap: '0.75rem', flex: 1, maxWidth: '30rem' }}>
             <div className="table-search-wrap" style={{ flex: 1 }}>
               <span className="table-search-icon"><Search size={16} /></span>
               <input
                 type="text"
-                placeholder="Tìm SKU, tên sản phẩm..."
+                placeholder="Tìm tên sản phẩm, Serial, mã nội bộ..."
                 className="table-search"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
               />
             </div>
-            <button className="table-filter-btn"><Filter size={15} /></button>
+            <div style={{ position: 'relative' }}>
+              <select
+                className="form-input"
+                style={{ paddingRight: '2.5rem', cursor: 'pointer', height: '100%' }}
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value as SerialStatus | '')}
+              >
+                <option value="">Tất cả trạng thái</option>
+                {IN_STOCK_STATUSES.map(s => (
+                  <option key={s} value={s}>{STATUS_LABELS[s]}</option>
+                ))}
+              </select>
+            </div>
           </div>
         </div>
 
@@ -116,86 +155,107 @@ export default function InventoryPage() {
             <thead>
               <tr>
                 <th>Sản phẩm</th>
+                <th>Serial / Mã nội bộ</th>
                 <th>Kho</th>
-                <th className="center">Tồn kho</th>
-                <th className="center">Khả dụng</th>
                 <th className="center">Trạng thái</th>
+                <th className="center">Grade</th>
+                <th className="right">Giá vốn</th>
                 <th className="right">Thao tác</th>
               </tr>
             </thead>
             <tbody>
               {isLoading ? (
                 <tr>
-                  <td colSpan={6}>
+                  <td colSpan={7}>
                     <div className="table-loading" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.75rem' }}>
                       <Loader2 size={28} className="animate-spin" style={{ color: '#4f46e5' }} />
                       <p style={{ color: '#94a3b8', fontWeight: 500, fontSize: '0.875rem' }}>Đang đọc dữ liệu tồn kho...</p>
                     </div>
                   </td>
                 </tr>
-              ) : filteredStock.length === 0 ? (
+              ) : filteredItems.length === 0 ? (
                 <tr>
-                  <td colSpan={6}>
+                  <td colSpan={7}>
                     <div className="table-empty">
                       <div className="table-empty-icon"><Package size={24} /></div>
-                      <p>Không có dữ liệu tồn kho. Nhập hàng để bắt đầu!</p>
+                      <p>
+                        {searchTerm || statusFilter
+                          ? 'Không tìm thấy thiết bị phù hợp.'
+                          : 'Kho đang trống. Hãy tạo phiếu nhập kho để bắt đầu!'}
+                      </p>
                     </div>
                   </td>
                 </tr>
-              ) : filteredStock.map((stock) => {
-                const status = getStockStatus(stock);
-                return (
-                  <tr key={stock.id}>
-                    <td>
-                      <span style={{ fontWeight: 700, color: '#0f172a', display: 'block' }}>{stock.product?.name}</span>
-                      <span className="sku-badge" style={{ marginTop: '0.25rem' }}>{stock.product?.sku}</span>
-                    </td>
-                    <td>
-                      <span style={{ fontWeight: 600, color: '#0f172a' }}>{stock.warehouse?.name || '—'}</span>
-                      <p style={{ fontFamily: 'monospace', fontSize: '0.75rem', color: '#94a3b8' }}>{stock.warehouse?.code}</p>
-                    </td>
-                    <td className="center">
-                      <span style={{
-                        fontSize: '1.5rem', fontWeight: 900, lineHeight: 1,
-                        color: stock.quantity <= 0 ? '#e11d48' : stock.quantity <= stock.minStockLevel ? '#d97706' : '#0f172a'
-                      }}>{stock.quantity}</span>
-                      <p style={{ fontSize: '0.625rem', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', marginTop: '0.125rem' }}>
-                        {stock.product?.baseUnit?.symbol || 'U'}
-                      </p>
-                    </td>
-                    <td className="center" style={{ fontWeight: 700, color: '#0f172a' }}>{stock.availableQuantity}</td>
-                    <td className="center">
-                      <span className={`stock-badge ${status.variant}`} style={{ gap: '0.375rem' }}>
-                        <status.icon size={12} />
-                        {status.label}
+              ) : filteredItems.map((item) => (
+                <tr key={item.id}>
+                  <td>
+                    <span style={{ fontWeight: 700, color: '#0f172a', display: 'block' }}>
+                      {item.productTemplate?.name}
+                    </span>
+                    <span style={{ fontSize: '0.75rem', color: '#94a3b8', display: 'block', marginTop: '0.125rem' }}>
+                      {item.productTemplate?.category?.name} · {item.productTemplate?.brand?.name}
+                    </span>
+                  </td>
+                  <td>
+                    {item.serialNumber ? (
+                      <span className="sku-badge" style={{ display: 'block', marginBottom: '0.25rem' }}>
+                        {item.serialNumber}
                       </span>
-                    </td>
-                    <td className="right">
-                      <button
-                        className="tbl-action-btn"
-                        style={{ marginLeft: 'auto', width: 'auto', padding: '0.5rem 0.875rem', gap: '0.375rem', borderRadius: '0.75rem', fontSize: '0.75rem', fontWeight: 700 }}
-                        onClick={() => setAdjustmentModal(stock)}
-                      >
-                        <ArrowUpDown size={14} /> Điều chỉnh
-                      </button>
-                    </td>
-                  </tr>
-                );
-              })}
+                    ) : null}
+                    <span style={{ fontFamily: 'monospace', fontSize: '0.75rem', color: '#64748b' }}>
+                      {item.internalCode}
+                    </span>
+                  </td>
+                  <td>
+                    <span style={{ fontWeight: 600, color: '#0f172a', display: 'block' }}>
+                      {item.warehouse?.name || '—'}
+                    </span>
+                    {item.binLocation && (
+                      <span style={{ fontFamily: 'monospace', fontSize: '0.75rem', color: '#94a3b8' }}>
+                        {item.binLocation}
+                      </span>
+                    )}
+                  </td>
+                  <td className="center">
+                    <span className={`stock-badge ${STATUS_COLORS[item.status] || ''}`}>
+                      {STATUS_LABELS[item.status] || item.status}
+                    </span>
+                  </td>
+                  <td className="center">
+                    {item.grade ? (
+                      <span className="chip">{GRADE_LABELS[item.grade] || item.grade}</span>
+                    ) : (
+                      <span style={{ color: '#cbd5e1', fontSize: '0.75rem' }}>—</span>
+                    )}
+                  </td>
+                  <td className="right" style={{ fontWeight: 700, color: '#0f172a' }}>
+                    {formatCurrency(Number(item.currentCostPrice))}
+                  </td>
+                  <td className="right">
+                    <button
+                      className="tbl-action-btn"
+                      style={{ marginLeft: 'auto', width: 'auto', padding: '0.5rem 0.875rem', gap: '0.375rem', borderRadius: '0.75rem', fontSize: '0.75rem', fontWeight: 700 }}
+                      onClick={() => setAdjustModal(item)}
+                    >
+                      <ArrowUpDown size={14} /> Cập nhật
+                    </button>
+                  </td>
+                </tr>
+              ))}
             </tbody>
           </table>
         </div>
       </div>
 
-      {/* Adjustment modal */}
-      {adjustmentModal && (
-        <AdjustmentModal
-          stockLevel={adjustmentModal}
-          onClose={() => setAdjustmentModal(null)}
+      {/* Status update modal */}
+      {adjustModal && (
+        <StatusModal
+          item={adjustModal}
+          onClose={() => setAdjustModal(null)}
           onSuccess={() => {
-            setAdjustmentModal(null);
+            setAdjustModal(null);
             queryClient.invalidateQueries({ queryKey: ['inventory'] });
-            queryClient.invalidateQueries({ queryKey: ['low-stock'] });
+            queryClient.invalidateQueries({ queryKey: ['inventory-stats'] });
           }}
         />
       )}
@@ -203,82 +263,78 @@ export default function InventoryPage() {
   );
 }
 
-function AdjustmentModal({ stockLevel, onClose, onSuccess }: { stockLevel: StockLevel; onClose: () => void; onSuccess: () => void }) {
+function StatusModal({ item, onClose, onSuccess }: { item: SerialItem; onClose: () => void; onSuccess: () => void }) {
   const [formData, setFormData] = useState({
-    productId: stockLevel.productId,
-    warehouseId: stockLevel.warehouseId,
-    newQuantity: stockLevel.quantity,
-    reason: ''
+    status: item.status as SerialStatus,
+    notes: '',
+    binLocation: item.binLocation || '',
   });
 
   const mutation = useMutation({
-    mutationFn: (data: StockAdjustmentDto) => inventoryApi.adjustStock(data),
-    onSuccess
+    mutationFn: () => inventoryApi.adjustStock({
+      serialItemId: item.id,
+      status: formData.status,
+      notes: formData.notes,
+      binLocation: formData.binLocation || undefined,
+    }),
+    onSuccess,
   });
-
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: name === 'newQuantity' ? Number(value) : value }));
-  };
 
   return (
     <div className="modal-overlay">
       <div className="modal-card sm">
-
         <div className="modal-header">
           <div className="modal-header-left">
             <div className="modal-icon indigo"><ArrowUpDown size={20} /></div>
             <div>
-              <p className="modal-title">Điều chỉnh tồn kho</p>
-              <p className="modal-subtitle">{stockLevel.product?.sku} — {stockLevel.product?.name}</p>
+              <p className="modal-title">Cập nhật trạng thái</p>
+              <p className="modal-subtitle">{item.serialNumber || item.internalCode} — {item.productTemplate?.name}</p>
             </div>
           </div>
           <button className="modal-close-btn" onClick={onClose}><X size={18} /></button>
         </div>
 
         <div className="modal-body">
-          {/* Current stock display */}
-          <div style={{
-            background: '#f8fafc', borderRadius: '0.875rem', padding: '1rem',
-            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-            marginBottom: '1.25rem', border: '1px solid #f1f5f9'
-          }}>
-            <div>
-              <p style={{ fontSize: '0.625rem', fontWeight: 900, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.15em', marginBottom: '0.25rem' }}>Tồn kho hiện tại</p>
-              <p style={{ fontSize: '2rem', fontWeight: 900, color: '#0f172a', lineHeight: 1 }}>
-                {stockLevel.quantity}{' '}
-                <span style={{ fontSize: '1rem', fontWeight: 600, color: '#94a3b8' }}>{stockLevel.product?.baseUnit?.symbol || 'U'}</span>
-              </p>
-            </div>
-            <div style={{ width: '2.75rem', height: '2.75rem', background: 'white', border: '1px solid #e2e8f0', borderRadius: '0.875rem', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#94a3b8' }}>
-              <Package size={20} />
-            </div>
+          <div className="form-field">
+            <label className="form-label">Trạng thái mới</label>
+            <select
+              className="form-input"
+              value={formData.status}
+              onChange={e => setFormData(p => ({ ...p, status: e.target.value as SerialStatus }))}
+            >
+              {(Object.keys(STATUS_LABELS) as SerialStatus[]).map(s => (
+                <option key={s} value={s}>{STATUS_LABELS[s]}</option>
+              ))}
+            </select>
           </div>
 
           <div className="form-field">
-            <label className="form-label">Số lượng mới (sau điều chỉnh)</label>
+            <label className="form-label">Vị trí kho (bin)</label>
             <input
-              type="number" name="newQuantity" min={0}
-              value={formData.newQuantity} onChange={handleChange} required
+              type="text"
               className="form-input"
-              style={{ textAlign: 'center', fontSize: '2rem', fontWeight: 900 }}
+              value={formData.binLocation}
+              onChange={e => setFormData(p => ({ ...p, binLocation: e.target.value }))}
+              placeholder="VD: A-1-05"
             />
           </div>
 
           <div className="form-field">
-            <label className="form-label">Lý do điều chỉnh <span style={{ color: '#e11d48' }}>*</span></label>
+            <label className="form-label">Ghi chú <span style={{ color: '#e11d48' }}>*</span></label>
             <textarea
-              name="reason" value={formData.reason} onChange={handleChange} required rows={3}
               className="form-input"
+              value={formData.notes}
+              onChange={e => setFormData(p => ({ ...p, notes: e.target.value }))}
+              rows={3}
               style={{ resize: 'none' }}
-              placeholder="VD: Kiểm kê thực tế, hàng hư hỏng, sai lệch nhập kho..."
+              placeholder="VD: Đã QC xong, máy đạt Grade A..."
             />
           </div>
 
           {mutation.isError && (
             <div className="error-box">
               <AlertTriangle size={18} style={{ color: '#e11d48', flexShrink: 0 }} />
-              <p>Không thể điều chỉnh. Kiểm tra thông tin.</p>
+              <p>Không thể cập nhật. Vui lòng thử lại.</p>
             </div>
           )}
         </div>
@@ -287,14 +343,13 @@ function AdjustmentModal({ stockLevel, onClose, onSuccess }: { stockLevel: Stock
           <button className="btn-cancel" onClick={onClose}>Hủy</button>
           <button
             className="btn-submit"
-            disabled={mutation.isPending}
-            onClick={() => mutation.mutate(formData)}
+            disabled={mutation.isPending || !formData.notes}
+            onClick={() => mutation.mutate()}
           >
             {mutation.isPending ? <Loader2 size={16} className="animate-spin" /> : <Target size={16} />}
-            Xác nhận điều chỉnh
+            Xác nhận
           </button>
         </div>
-
       </div>
     </div>
   );

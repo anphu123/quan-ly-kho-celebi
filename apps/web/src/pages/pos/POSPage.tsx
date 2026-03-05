@@ -1,315 +1,334 @@
-import { useState } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { ShoppingCart, Search, Plus, Minus, Trash2, CreditCard, Wallet, Receipt, Package, User, Loader2, Sparkles, ChevronRight, Zap, Target, Layers } from 'lucide-react';
-import { productsApi, type Product } from '../../lib/api/products.api';
-import { ordersApi, type CreateOrderDto } from '../../lib/api/orders.api';
-import { customersApi, type Customer, type CustomersResponse } from '../../lib/api/customers.api';
+import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import {
+  Search, ArrowLeft, Trash2, CheckCircle,
+  CreditCard, Banknote, AlertCircle, ShoppingCart
+} from 'lucide-react';
+import { usePosStore } from '../../stores/pos.store';
+import { posApi, type PosProduct } from '../../api/pos.api';
+import { warehousesApi } from '../../lib/api/warehouses.api';
 
-interface CartItem {
-  product: Product;
-  quantity: number;
-}
+// Format currency
+const formatCurrency = (amount: number) => {
+  return new Intl.NumberFormat('vi-VN').format(amount) + ' ₫';
+};
 
 export default function POSPage() {
-  const queryClient = useQueryClient();
-  const [searchTerm, setSearchTerm] = useState('');
-  const [cart, setCart] = useState<CartItem[]>([]);
-  const [selectedCustomerId, setSelectedCustomerId] = useState<string>('');
-  const [paymentMethod, setPaymentMethod] = useState<'CASH' | 'BANK_TRANSFER' | 'CARD'>('CASH');
+  const navigate = useNavigate();
+  const { cart, addItem, removeItem, updatePrice, clearCart, getTotal, paymentMethod, setPaymentMethod, notes, setNotes } = usePosStore();
 
-  const { data: productsData, isLoading: isLoadingProducts } = useQuery({
-    queryKey: ['products', searchTerm],
-    queryFn: () => productsApi.getAll({ limit: 50, search: searchTerm }),
-  });
+  const [warehouses, setWarehouses] = useState<any[]>([]);
+  const [selectedWarehouseId, setSelectedWarehouseId] = useState('');
 
-  const { data: customersResponse } = useQuery<CustomersResponse>({
-    queryKey: ['customers'],
-    queryFn: () => customersApi.getAll({ limit: 100 }),
-  });
+  const [keyword, setKeyword] = useState('');
+  const [searchResults, setSearchResults] = useState<PosProduct[]>([]);
+  const [searching, setSearching] = useState(false);
 
-  const customers = customersResponse?.data || [];
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState(false);
 
-  const createOrderMutation = useMutation({
-    mutationFn: (dto: CreateOrderDto) => ordersApi.create(dto),
-    onSuccess: () => {
-      setCart([]);
-      setSelectedCustomerId('');
-      queryClient.invalidateQueries({ queryKey: ['products'] });
-      alert('Đơn hàng đã được khởi tạo thành công trên hệ thống!');
-    },
-  });
-
-  const addToCart = (product: Product) => {
-    setCart(prev => {
-      const existing = prev.find(item => item.product.id === product.id);
-      if (existing) {
-        return prev.map(item => item.product.id === product.id ? { ...item, quantity: item.quantity + 1 } : item);
+  // Load warehouses on mount
+  useEffect(() => {
+    warehousesApi.getAll().then(res => {
+      setWarehouses(res.data);
+      if (res.data.length > 0) {
+        setSelectedWarehouseId(res.data[0].id);
       }
-      return [...prev, { product, quantity: 1 }];
     });
-  };
+  }, []);
 
-  const updateQuantity = (productId: string, delta: number) => {
-    setCart(prev => prev.map(item => {
-      if (item.product.id === productId) {
-        const newQty = Math.max(0, item.quantity + delta);
-        return { ...item, quantity: newQty };
+  // Search items automatically with debounce
+  useEffect(() => {
+    if (!selectedWarehouseId || !keyword || keyword.length < 2) {
+      setSearchResults([]);
+      return;
+    }
+
+    const delay = setTimeout(async () => {
+      try {
+        setSearching(true);
+        const results = await posApi.searchItems(selectedWarehouseId, keyword);
+        setSearchResults(results);
+      } catch (err) {
+        console.error('Lỗi khi tìm kiếm sản phẩm:', err);
+      } finally {
+        setSearching(false);
       }
-      return item;
-    }).filter(item => item.quantity > 0));
-  };
+    }, 400);
 
-  const removeFromCart = (productId: string) => {
-    setCart(prev => prev.filter(item => item.product.id !== productId));
-  };
+    return () => clearTimeout(delay);
+  }, [keyword, selectedWarehouseId]);
 
-  const subtotal = cart.reduce((sum, item) => sum + (Number(item.product.sellingPrice) * item.quantity), 0);
-  const total = subtotal; // Can add discount logic later
-
-  const handleCheckout = () => {
+  const handleCheckout = async () => {
     if (cart.length === 0) return;
-    const checkoutData: CreateOrderDto = {
-      customerId: selectedCustomerId || undefined,
-      items: cart.map(item => ({ productId: item.product.id, quantity: item.quantity, price: Number(item.product.sellingPrice) })),
-      paymentMethod,
-      totalAmount: total,
-    };
-    createOrderMutation.mutate(checkoutData);
-  };
 
-  const formatPrice = (price: number) => {
-    return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(price);
+    try {
+      setSubmitting(true);
+      setError('');
+
+      const payload = {
+        warehouseId: selectedWarehouseId,
+        paymentMethod: paymentMethod,
+        notes: notes,
+        items: cart.map(item => ({
+          serialItemId: item.id,
+          unitPrice: item.unitPrice,
+          discount: item.discount
+        }))
+      };
+
+      await posApi.checkout(payload);
+
+      setSuccess(true);
+      clearCart();
+      setTimeout(() => setSuccess(false), 3000);
+    } catch (err: any) {
+      setError(err.response?.data?.message || 'Lỗi khi thanh toán');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
-    <div className="flex h-[calc(100vh-140px)] gap-6 animate-fade-in overflow-hidden px-4 lg:px-0">
+    <div className="h-screen flex flex-col bg-slate-100 overflow-hidden font-sans">
 
-      {/* Left Column: Product Catalog Catalysts */}
-      <div className="flex-1 flex flex-col gap-6 min-w-0">
+      {/* ─── Top Navbar ─── */}
+      <header className="h-16 bg-slate-900 text-white flex items-center px-4 justify-between border-b border-slate-800 shrink-0">
+        <div className="flex items-center gap-4">
+          <button
+            onClick={() => navigate('/dashboard')}
+            className="w-10 h-10 rounded-full bg-slate-800 flex items-center justify-center hover:bg-slate-700 transition-colors"
+          >
+            <ArrowLeft size={20} />
+          </button>
 
-        {/* Sleek Search Header */}
-        <div className="card bg-slate-900 border-none relative overflow-hidden shrink-0 group">
-          <div className="absolute inset-0 bg-gradient-to-r from-indigo-600/20 to-purple-600/20 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
-          <div className="card-body p-5 relative z-10">
-            <div className="flex items-center gap-4">
-              <div className="relative flex-1 group/input">
-                <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-500 group-focus-within/input:text-indigo-400 transition-colors" />
-                <input
-                  type="text"
-                  placeholder="Quét mã vạch hoặc nhập tên SKU sản phẩm..."
-                  className="w-full pl-12 pr-4 py-4 bg-slate-950 border border-slate-800 rounded-2xl text-white outline-none focus:ring-4 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all font-bold placeholder:text-slate-600"
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                />
-              </div>
-              <div className="flex gap-2">
-                <button className="w-14 h-14 bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white rounded-2xl transition-all flex items-center justify-center border border-slate-700 shadow-xl">
-                  <Target className="w-6 h-6" />
-                </button>
-                <button className="w-14 h-14 bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white rounded-2xl transition-all flex items-center justify-center border border-slate-700 shadow-xl">
-                  <Layers className="w-6 h-6" />
-                </button>
-              </div>
-            </div>
+          <div className="flex flex-col">
+            <span className="font-bold tracking-wider text-xl">CELEBI</span>
+            <span className="text-[10px] text-slate-400 font-medium uppercase tracking-widest">Point of Sale</span>
           </div>
         </div>
 
-        {/* Product Grid - Industrial Style */}
-        <div className="flex-1 overflow-y-auto custom-scrollbar-dark pr-2">
-          {isLoadingProducts ? (
-            <div className="h-full flex flex-col items-center justify-center space-y-4">
-              <Loader2 className="w-10 h-10 text-indigo-500 animate-spin" />
-              <p className="text-slate-500 font-black uppercase tracking-[0.2em] text-xs">Initializing Terminal UI</p>
+        <div className="flex items-center gap-4">
+          <select
+            className="bg-slate-800 border-none text-sm text-white rounded-lg px-4 py-2 font-medium focus:ring-0"
+            value={selectedWarehouseId}
+            onChange={(e) => setSelectedWarehouseId(e.target.value)}
+          >
+            {warehouses.map(w => (
+              <option key={w.id} value={w.id}>{w.name}</option>
+            ))}
+          </select>
+
+          <div className="w-px h-8 bg-slate-800 mx-2"></div>
+
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 rounded-full bg-indigo-500 text-white flex justify-center items-center font-bold text-sm">
+              AD
             </div>
-          ) : (
-            <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-              {productsData?.data.map((product) => {
-                const inCart = cart.find(item => item.product.id === product.id);
-                return (
-                  <button
-                    key={product.id}
-                    onClick={() => addToCart(product)}
-                    className="group relative flex flex-col items-start p-4 bg-white border border-slate-200 rounded-[2rem] hover:border-indigo-500 hover:shadow-2xl hover:shadow-indigo-500/10 transition-all duration-300 text-left overflow-hidden active:scale-[0.98]"
-                  >
-                    {inCart && (
-                      <div className="absolute top-4 right-4 w-8 h-8 rounded-full bg-indigo-600 text-white flex items-center justify-center text-xs font-[1000] shadow-lg animate-scale-in">
-                        {inCart.quantity}
-                      </div>
-                    )}
-
-                    <div className="w-full aspect-square bg-slate-50 rounded-2xl mb-4 flex items-center justify-center group-hover:bg-indigo-50 transition-colors">
-                      <Package className="w-12 h-12 text-slate-200 group-hover:text-indigo-200 transition-colors" />
-                    </div>
-
-                    <div className="space-y-1">
-                      <p className="text-[10px] font-black text-indigo-500 uppercase tracking-widest">{product.category?.name}</p>
-                      <h3 className="font-extrabold text-slate-900 leading-tight line-clamp-2 group-hover:text-indigo-600 transition-colors">{product.name}</h3>
-                      <p className="text-[11px] text-slate-400 font-bold uppercase tracking-widest mt-1">{product.sku}</p>
-                    </div>
-
-                    <div className="mt-4 pt-4 border-t border-slate-100 w-full flex items-center justify-between">
-                      <div className="font-[1000] text-lg text-slate-900 tracking-tighter">
-                        {formatPrice(Number(product.sellingPrice))}
-                      </div>
-                      <div className="w-8 h-8 rounded-lg bg-slate-900 text-white flex items-center justify-center group-hover:bg-indigo-600 transition-colors">
-                        <Plus className="w-4 h-4" />
-                      </div>
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
-          )}
+            <div className="text-sm font-medium">Admin</div>
+          </div>
         </div>
-      </div>
+      </header>
 
-      {/* Right Column: Checkout Sidebar (Glassmorphism Dark) */}
-      <div className="w-full lg:w-[420px] shrink-0 flex flex-col card bg-slate-900 border-none shadow-[0_20px_100px_rgba(0,0,0,0.5)] relative overflow-hidden">
+      {/* ─── Main Content ─── */}
+      <div className="flex flex-1 overflow-hidden">
 
-        {/* Animated Background Elements */}
-        <div className="absolute -top-24 -right-24 w-64 h-64 bg-indigo-600/20 blur-[100px] rounded-full" />
-        <div className="absolute -bottom-24 -left-24 w-64 h-64 bg-purple-600/20 blur-[100px] rounded-full" />
+        {/* LEFTPANEL: Product Search */}
+        <div className="flex-1 flex flex-col p-6 overflow-hidden">
 
-        <div className="relative z-10 flex flex-col h-full">
+          {/* Search Box */}
+          <div className="relative mb-6">
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={24} />
+            <input
+              type="text"
+              className="w-full h-14 pl-14 pr-4 rounded-2xl border-none shadow-sm text-lg focus:ring-2 focus:ring-indigo-500 font-medium bg-white"
+              placeholder="Quét mã vạch (Serial/IMEI) hoặc tìm tên máy..."
+              value={keyword}
+              onChange={(e) => setKeyword(e.target.value)}
+              autoFocus
+            />
+          </div>
+
+          {/* Search Results */}
+          <div className="flex-1 overflow-y-auto pr-2 custom-scrollbar">
+            {searching ? (
+              <div className="flex justify-center p-8 text-slate-400">Đang tìm kiếm...</div>
+            ) : searchResults.length > 0 ? (
+              <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                {searchResults.map(product => {
+                  const inCart = cart.some(item => item.id === product.id);
+
+                  return (
+                    <div
+                      key={product.id}
+                      onClick={() => !inCart && addItem(product)}
+                      className={`
+                        bg-white p-4 rounded-2xl cursor-pointer transition-all border-2
+                        ${inCart ? 'border-indigo-500 opacity-60' : 'border-transparent hover:border-indigo-200 hover:shadow-md'}
+                      `}
+                    >
+                      <div className="text-xs font-bold text-indigo-500 mb-1">{product.productTemplate.brand?.name}</div>
+                      <h4 className="font-bold text-slate-800 leading-tight mb-2 h-10 line-clamp-2">
+                        {product.productTemplate.name}
+                      </h4>
+
+                      <div className="flex flex-col gap-1 mb-3">
+                        <span className="text-xs font-mono bg-slate-100 text-slate-600 px-2 py-1 rounded inline-flex w-fit max-w-full overflow-hidden text-ellipsis whitespace-nowrap">
+                          {product.serialNumber || product.internalCode}
+                        </span>
+                      </div>
+
+                      <div className="flex justify-between items-end mt-auto">
+                        <span className="text-xs font-bold text-slate-400 bg-slate-100 px-2 py-1 rounded-lg">
+                          {product.grade || 'Mới'}
+                        </span>
+                        <div className="text-lg font-extrabold text-emerald-600">
+                          {formatCurrency(product.suggestedPrice)}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : keyword.length >= 2 ? (
+              <div className="flex flex-col items-center justify-center p-12 text-slate-400">
+                <Search size={48} className="mb-4 opacity-20" />
+                <p>Không tìm thấy máy khả dụng (Trạng thái AVAILABLE).</p>
+              </div>
+            ) : (
+              <div className="flex flex-col items-center justify-center p-12 text-slate-400 h-full">
+                <ShoppingCart size={48} className="mb-4 opacity-20" />
+                <p>Nhập mã IMEI hoặc tên máy để thêm vào giỏ.</p>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* RIGHTPANEL: Cart & Checkout */}
+        <div className="w-[480px] bg-white border-l border-slate-200 flex flex-col shrink-0">
+
           {/* Cart Header */}
-          <div className="p-6 border-b border-slate-800/50 flex items-center justify-between bg-slate-900/40 backdrop-blur-md">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-indigo-500/20 flex items-center justify-center text-indigo-400">
-                <ShoppingCart className="w-5 h-5" />
-              </div>
-              <div>
-                <h2 className="text-lg font-black text-white tracking-tight">Giỏ hàng Hiện tại</h2>
-                <div className="flex items-center gap-1.5 text-[10px] uppercase font-black tracking-widest text-slate-500 mt-0.5">
-                  <Zap className="w-3 h-3 text-amber-400" /> Terminal ID: 001
-                </div>
-              </div>
-            </div>
+          <div className="p-5 border-b border-slate-100 flex justify-between items-center">
+            <h2 className="text-xl font-bold flex items-center gap-3">
+              <ShoppingCart size={24} className="text-indigo-500" />
+              Giỏ hàng
+              <span className="bg-indigo-100 text-indigo-700 text-sm py-1 px-3 rounded-full">{cart.length} máy</span>
+            </h2>
             <button
-              onClick={() => setCart([])}
-              className="text-[10px] font-black uppercase text-slate-500 hover:text-rose-400 transition-colors tracking-widest"
-              disabled={cart.length === 0}
+              onClick={clearCart}
+              className="text-slate-400 hover:text-red-500 transition-colors"
             >
-              Làm rỗng
+              <Trash2 size={20} />
             </button>
           </div>
 
-          {/* Customer Selection */}
-          <div className="p-4 bg-slate-950/30 border-b border-slate-800/50">
-            <div className="relative group">
-              <User className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-600 group-focus-within:text-indigo-400" />
-              <select
-                className="w-full pl-11 pr-4 py-3 bg-slate-900 border border-slate-800 rounded-xl text-[13px] font-bold text-slate-300 outline-none focus:border-indigo-500/50 transition-all appearance-none cursor-pointer"
-                value={selectedCustomerId}
-                onChange={(e) => setSelectedCustomerId(e.target.value)}
-              >
-                <option value="">Khách vãng lai (Guest)</option>
-                {customers.map((c: Customer) => (
-                  <option key={c.id} value={c.id}>{c.fullName} - {c.phone}</option>
-                ))}
-              </select>
-              <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-slate-600">
-                <ChevronRight className="w-4 h-4 rotate-90" />
-              </div>
-            </div>
-          </div>
-
-          {/* Cart Items List */}
-          <div className="flex-1 overflow-y-auto custom-scrollbar-dark p-4 space-y-4">
+          {/* Cart Items */}
+          <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-3 custom-scrollbar">
             {cart.length === 0 ? (
-              <div className="h-full flex flex-col items-center justify-center text-center p-8 space-y-4">
-                <div className="w-20 h-20 bg-slate-800/50 rounded-[2.5rem] flex items-center justify-center">
-                  <ShoppingCart className="w-8 h-8 text-slate-700" />
+              <div className="flex-1 flex flex-col items-center justify-center text-slate-400 gap-4">
+                <div className="w-24 h-24 bg-slate-50 rounded-full flex items-center justify-center">
+                  <ShoppingCart size={40} className="text-slate-300" />
                 </div>
-                <div>
-                  <p className="text-slate-300 font-black text-lg">Giỏ hàng trống</p>
-                  <p className="text-slate-500 text-[13px] font-medium mt-1">Chọn sản phẩm từ danh mục để bắt đầu thanh toán</p>
-                </div>
+                Giỏ hàng trống
               </div>
             ) : (
               cart.map((item) => (
-                <div key={item.product.id} className="group relative flex items-center gap-4 p-3.5 bg-slate-950/40 rounded-2xl border border-slate-800/50 hover:border-slate-700/50 transition-all">
-                  <div className="w-14 h-14 rounded-xl bg-slate-800/50 flex items-center justify-center text-slate-600 shrink-0">
-                    <Package className="w-6 h-6" />
+                <div key={item.id} className="p-4 rounded-xl border border-slate-200 hover:border-indigo-300 transition-colors relative group">
+                  <button
+                    onClick={() => removeItem(item.id)}
+                    className="absolute -top-2 -right-2 w-6 h-6 bg-red-100 text-red-600 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                  >
+                    ✕
+                  </button>
+
+                  <div className="font-bold text-slate-800 text-sm mb-1">{item.productTemplate.name}</div>
+                  <div className="font-mono text-xs text-slate-500 mb-3 block">
+                    {item.serialNumber || item.internalCode}
                   </div>
 
-                  <div className="flex-1 min-w-0">
-                    <h4 className="text-[13px] font-extrabold text-white truncate leading-tight">{item.product.name}</h4>
-                    <p className="text-[11px] font-bold text-indigo-400 mt-0.5">{formatPrice(Number(item.product.sellingPrice))}</p>
-
-                    <div className="flex items-center gap-3 mt-2.5">
-                      <div className="flex items-center bg-slate-900 border border-slate-800 rounded-lg overflow-hidden h-7">
-                        <button onClick={() => updateQuantity(item.product.id, -1)} className="px-2.5 hover:bg-slate-800 text-slate-500 transition-colors">
-                          <Minus className="w-3 h-3" />
-                        </button>
-                        <span className="w-8 text-center text-[12px] font-black text-white">{item.quantity}</span>
-                        <button onClick={() => updateQuantity(item.product.id, 1)} className="px-2.5 hover:bg-slate-800 text-slate-500 transition-colors">
-                          <Plus className="w-3 h-3" />
-                        </button>
+                  <div className="flex items-end justify-between gap-4 mt-2">
+                    <div className="flex flex-col w-1/2">
+                      <label className="text-[10px] uppercase font-bold text-slate-400 mb-1">Giá chốt bán</label>
+                      <input
+                        type="number"
+                        value={item.unitPrice}
+                        onChange={(e) => updatePrice(item.id, Number(e.target.value))}
+                        className="font-bold text-lg border-b border-slate-200 focus:border-indigo-500 outline-none pb-1 bg-transparent w-full"
+                      />
+                    </div>
+                    {/* Optional explicit discount input could go here, but omitted for simplicity as price can be edited directly */}
+                    <div className="text-right pb-1">
+                      <div className="font-extrabold text-emerald-600">
+                        {formatCurrency(item.unitPrice)}
                       </div>
                     </div>
                   </div>
-
-                  <button onClick={() => removeFromCart(item.product.id)} className="w-10 h-10 flex items-center justify-center text-slate-600 hover:text-rose-400 hover:bg-rose-400/10 rounded-xl transition-all opacity-0 group-hover:opacity-100">
-                    <Trash2 className="w-4 h-4" />
-                  </button>
                 </div>
               ))
             )}
           </div>
 
-          {/* Checkout Summary */}
-          <div className="p-6 bg-slate-950/80 backdrop-blur-2xl border-t border-slate-800 space-y-6">
-
-            <div className="space-y-3">
-              <div className="flex justify-between items-center text-slate-500 font-bold text-sm tracking-tight">
-                <span className="uppercase text-[10px] tracking-widest">Tạm tính:</span>
-                <span className="text-white">{formatPrice(subtotal)}</span>
-              </div>
-              <div className="flex justify-between items-end">
-                <div className="flex flex-col">
-                  <span className="text-indigo-400 font-black uppercase text-[10px] tracking-[0.2em] mb-1">Tổng cộng hóa đơn</span>
-                  <span className="text-3xl font-[1000] text-white tracking-tighter">{formatPrice(total)}</span>
-                </div>
-                <div className="text-emerald-500 text-[10px] font-black uppercase tracking-widest pb-1 flex items-center gap-1.5">
-                  <Sparkles className="w-3 h-3" /> Thuế 0%
-                </div>
-              </div>
+          {/* Payment Settings */}
+          <div className="p-4 border-t border-slate-100">
+            <div className="flex gap-2 mb-4">
+              <button
+                onClick={() => setPaymentMethod('CASH')}
+                className={`flex-1 py-3 px-4 rounded-xl border-2 flex flex-col items-center justify-center gap-2 transition-all font-bold text-sm ${paymentMethod === 'CASH' ? 'border-indigo-500 bg-indigo-50 text-indigo-700' : 'border-slate-200 text-slate-500 hover:border-slate-300'}`}
+              >
+                <Banknote size={20} /> Tiền mặt
+              </button>
+              <button
+                onClick={() => setPaymentMethod('BANK_TRANSFER')}
+                className={`flex-1 py-3 px-4 rounded-xl border-2 flex flex-col items-center justify-center gap-2 transition-all font-bold text-sm ${paymentMethod === 'BANK_TRANSFER' ? 'border-indigo-500 bg-indigo-50 text-indigo-700' : 'border-slate-200 text-slate-500 hover:border-slate-300'}`}
+              >
+                <CreditCard size={20} /> Chuyển khoản
+              </button>
             </div>
+            <div>
+              <input
+                type="text"
+                placeholder="Ghi chú đơn hàng..."
+                value={notes}
+                onChange={e => setNotes(e.target.value)}
+                className="w-full bg-slate-50 border border-slate-200 rounded-lg px-4 py-3 text-sm focus:bg-white focus:border-indigo-500 outline-none"
+              />
+            </div>
+          </div>
 
-            {/* Payment Methods */}
-            <div className="grid grid-cols-3 gap-2">
-              {[
-                { id: 'CASH' as const, icon: Wallet, label: 'Tiền mặt' },
-                { id: 'BANK_TRANSFER' as const, icon: CreditCard, label: 'Chuyển khoản' },
-                { id: 'CARD' as const, icon: Receipt, label: 'Thẻ ATM' },
-              ].map((method) => (
-                <button
-                  key={method.id}
-                  onClick={() => setPaymentMethod(method.id)}
-                  className={`flex flex-col items-center gap-2 p-3 rounded-2xl border transition-all ${paymentMethod === method.id ? 'bg-indigo-600 border-indigo-600 text-white shadow-lg shadow-indigo-600/20' : 'bg-slate-900 border-slate-800 text-slate-500 hover:border-slate-700'}`}
-                >
-                  <method.icon className="w-5 h-5" />
-                  <span className="text-[10px] font-black uppercase tracking-widest leading-none">{method.label}</span>
-                </button>
-              ))}
+          {/* Checkout Footer */}
+          <div className="p-6 bg-slate-900 text-white rounded-tl-3xl shadow-[0_-10px_40px_rgba(0,0,0,0.1)]">
+
+            {error && (
+              <div className="bg-red-500/20 text-red-200 p-3 rounded-lg mb-4 text-sm flex items-center gap-2">
+                <AlertCircle size={16} /> {error}
+              </div>
+            )}
+
+            {success && (
+              <div className="bg-emerald-500/20 text-emerald-200 p-3 rounded-lg mb-4 text-sm flex items-center justify-center gap-2 font-bold animate-pulse">
+                <CheckCircle size={18} /> THÀNH TOÁN THÀNH CÔNG!
+              </div>
+            )}
+
+            <div className="flex justify-between items-center mb-6">
+              <span className="text-slate-400 font-medium">Khách cần trả</span>
+              <span className="text-4xl font-black text-emerald-400 tracking-tight">
+                {formatCurrency(getTotal())}
+              </span>
             </div>
 
             <button
               onClick={handleCheckout}
-              disabled={cart.length === 0 || createOrderMutation.isPending}
-              className="relative w-full py-5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-[2rem] font-black text-sm uppercase tracking-[0.2em] transition-all shadow-2xl shadow-indigo-600/30 active:scale-95 disabled:opacity-50 group flex items-center justify-center overflow-hidden"
+              disabled={cart.length === 0 || submitting}
+              className="w-full bg-indigo-500 hover:bg-indigo-400 disabled:bg-slate-800 disabled:text-slate-500 text-white h-16 rounded-xl font-black text-lg flex items-center justify-center gap-3 transition-colors uppercase tracking-widest"
             >
-              <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/40 to-transparent" />
-              {createOrderMutation.isPending ? <Loader2 className="w-6 h-6 animate-spin" /> : (
-                <>
-                  <CreditCard className="w-5 h-5 mr-3 group-hover:scale-110 transition-transform" />
-                  Xử lý thanh toán
-                </>
-              )}
+              {submitting ? 'Đang xử lý...' : 'Thanh toán'}
             </button>
           </div>
 
         </div>
+
       </div>
     </div>
   );

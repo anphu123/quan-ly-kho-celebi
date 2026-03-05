@@ -1,4 +1,4 @@
-import { IsString, IsOptional, IsEmail, IsEnum, IsDateString, IsDecimal, IsBoolean, IsArray, ValidateNested, IsNotEmpty, MinLength } from 'class-validator';
+import { IsString, IsOptional, IsEmail, IsEnum, IsDateString, IsBoolean, IsArray, ValidateNested, IsNotEmpty, MinLength, IsNumber, IsPositive, Min } from 'class-validator';
 import { Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { InboundStatus, SupplierType } from '@prisma/client';
@@ -39,13 +39,104 @@ export class CreateInboundItemDto {
 
   @ApiPropertyOptional({ description: 'Estimated value' })
   @IsOptional()
-  @IsDecimal()
+  @IsNumber({ maxDecimalPlaces: 2 })
+  @Min(0)
   estimatedValue?: number;
 
   @ApiPropertyOptional({ description: 'Notes about condition' })
   @IsOptional()
   @IsString()
   notes?: string;
+
+  @ApiPropertyOptional({ description: 'Trade-in customer name' })
+  @IsOptional()
+  @IsString()
+  sourceCustomerName?: string;
+
+  @ApiPropertyOptional({ description: 'Trade-in customer phone number' })
+  @IsOptional()
+  @IsString()
+  sourceCustomerPhone?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  sourceCustomerAddress?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  sourceCustomerIdCard?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsDateString()
+  idCardIssueDate?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  idCardIssuePlace?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  bankAccount?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  bankName?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  contractNumber?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsDateString()
+  purchaseDate?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  employeeName?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsNumber({ maxDecimalPlaces: 2 })
+  otherCosts?: number;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsNumber({ maxDecimalPlaces: 2 })
+  topUp?: number;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsNumber({ maxDecimalPlaces: 2 })
+  repairCost?: number;
+
+  @ApiPropertyOptional({ description: 'Image URL of device (primary)' })
+  @IsOptional()
+  @IsString()
+  imageUrl?: string;
+
+  @ApiPropertyOptional({ description: 'JSON array of additional device images' })
+  @IsOptional()
+  @IsString()
+  deviceImages?: string;
+
+  @ApiPropertyOptional({ description: 'CCCD front image' })
+  @IsOptional()
+  @IsString()
+  cccdFrontUrl?: string;
+
+  @ApiPropertyOptional({ description: 'CCCD back image' })
+  @IsOptional()
+  @IsString()
+  cccdBackUrl?: string;
 }
 
 // ===========================// INBOUND REQUEST DTOs
@@ -83,7 +174,8 @@ export class CreateInboundRequestDto {
 
   @ApiPropertyOptional({ description: 'Total estimated value' })
   @IsOptional()
-  @IsDecimal()
+  @IsNumber({ maxDecimalPlaces: 2 })
+  @Min(0)
   totalEstimatedValue?: number;
 
   @ApiPropertyOptional({ description: 'Additional notes' })
@@ -131,12 +223,14 @@ export class UpdateInboundRequestDto {
 
   @ApiPropertyOptional()
   @IsOptional()
-  @IsDecimal()
+  @IsNumber({ maxDecimalPlaces: 2 })
+  @IsPositive()
   totalEstimatedValue?: number;
 
   @ApiPropertyOptional()
   @IsOptional()
-  @IsDecimal()
+  @IsNumber({ maxDecimalPlaces: 2 })
+  @IsPositive()
   totalActualValue?: number;
 
   @ApiPropertyOptional()
@@ -172,7 +266,8 @@ export class UpdateInboundItemDto {
 
   @ApiPropertyOptional()
   @IsOptional()
-  @IsDecimal()
+  @IsNumber({ maxDecimalPlaces: 2 })
+  @IsPositive()
   estimatedValue?: number;
 
   @ApiPropertyOptional()
@@ -184,11 +279,112 @@ export class UpdateInboundItemDto {
   @IsOptional()
   @IsBoolean()
   isReceived?: boolean;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  sourceCustomerName?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  sourceCustomerPhone?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  sourceCustomerAddress?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  sourceCustomerIdCard?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsDateString()
+  idCardIssueDate?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  idCardIssuePlace?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  bankAccount?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  bankName?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  contractNumber?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsDateString()
+  purchaseDate?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  employeeName?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsNumber({ maxDecimalPlaces: 2 })
+  otherCosts?: number;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsNumber({ maxDecimalPlaces: 2 })
+  topUp?: number;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsNumber({ maxDecimalPlaces: 2 })
+  repairCost?: number;
+
+  @ApiPropertyOptional({ description: 'Image URL of device (primary)' })
+  @IsOptional()
+  @IsString()
+  imageUrl?: string;
+
+  @ApiPropertyOptional({ description: 'JSON array string of additional device images' })
+  @IsOptional()
+  @IsString()
+  deviceImages?: string;
+
+  @ApiPropertyOptional({ description: 'CCCD front image' })
+  @IsOptional()
+  @IsString()
+  cccdFrontUrl?: string;
+
+  @ApiPropertyOptional({ description: 'CCCD back image' })
+  @IsOptional()
+  @IsString()
+  cccdBackUrl?: string;
 }
 
 // ===========================
 // RECEIVING PROCESS DTOs
 // ===========================
+
+export class CustomAttributeDto {
+  @ApiProperty({ description: 'The Attribute ID from the dynamic EAV system' })
+  @IsString()
+  @IsNotEmpty()
+  attributeId: string;
+
+  @ApiProperty({ description: 'The value for the dynamic attribute' })
+  @IsNotEmpty()
+  value: any;
+}
 
 export class ReceiveItemDto {
   @ApiProperty({ description: 'Inbound item ID' })
@@ -207,7 +403,8 @@ export class ReceiveItemDto {
   condition?: string;
 
   @ApiProperty({ description: 'Purchase price' })
-  @IsDecimal()
+  @IsNumber({ maxDecimalPlaces: 2 })
+  @IsPositive()
   purchasePrice: number;
 
   @ApiPropertyOptional({ description: 'Warehouse bin location' })
@@ -219,6 +416,13 @@ export class ReceiveItemDto {
   @IsOptional()
   @IsString()
   notes?: string;
+
+  @ApiPropertyOptional({ type: [CustomAttributeDto], description: 'Custom dynamic attributes (e.g., Battery Health %, Condition)' })
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => CustomAttributeDto)
+  customAttributes?: CustomAttributeDto[];
 }
 
 export class CompleteInboundDto {
@@ -235,7 +439,8 @@ export class CompleteInboundDto {
 
   @ApiPropertyOptional({ description: 'Total actual value' })
   @IsOptional()
-  @IsDecimal()
+  @IsNumber({ maxDecimalPlaces: 2 })
+  @IsPositive()
   totalActualValue?: number;
 
   @ApiPropertyOptional({ description: 'Completion notes' })
