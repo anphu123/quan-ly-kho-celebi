@@ -539,24 +539,129 @@ async function main() {
   // OUTBOUND TEST DATA ⭐ NEW
   // ===========================
 
-  // Update samsung1 to simulate it being disposed
-  await prisma.serialItem.update({
-    where: { id: samsung1.id },
-    data: { status: 'DISPOSED' }
+  // ===========================
+  // INBOUND & TRADE-IN TEST DATA ⭐ NEW
+  // ===========================
+
+  console.log('📦 Seeding Inbound & Trade-In data...')
+
+  // 1. Create Xiaomi Suppliers (needed for frontend filter)
+  const storeTanPhu = await prisma.supplier.create({
+    data: {
+      code: 'XIAOMI-TP',
+      name: 'Xiaomi Store - Tân Phú',
+      contactPerson: 'Anh Minh',
+      phone: '0901234567',
+      address: 'Aeon Mall Tân Phú, TP.HCM',
+    }
   })
 
-  // Log transaction cho việc thanh lý máy
-  await prisma.serialTransaction.create({
+  const storeQuan7 = await prisma.supplier.create({
     data: {
-      serialItemId: samsung1.id,
-      type: 'DISPOSAL',
-      fromLocation: 'A-1-01',
-      toLocation: 'Disposed',
-      fromStatus: 'AVAILABLE',
-      toStatus: 'DISPOSED',
-      performedById: admin.id,
-      notes: 'Thanh lý máy do quá hạn',
-      createdAt: new Date('2024-03-03T09:00:00')
+      code: 'XIAOMI-Q7',
+      name: 'Xiaomi Store - Quận 7',
+      contactPerson: 'Chị Lan',
+      phone: '0909876543',
+      address: 'Lotte Mart Quận 7, TP.HCM',
+    }
+  })
+
+  // 2. Create Inbound Requests (Trade-In)
+  const tradeIn1 = await prisma.inboundRequest.create({
+    data: {
+      code: 'INB-TR-001',
+      warehouseId: mainWarehouse.id,
+      status: 'REQUESTED',
+      supplierType: 'CUSTOMER_TRADE_IN',
+      supplierName: 'Xiaomi Store - Tân Phú',
+      supplierPhone: '0901234567',
+      expectedDate: new Date(),
+      totalEstimatedValue: 15000000,
+      notes: 'Lô hàng trade-in ngày 05/03',
+      items: {
+        create: [
+          {
+            categoryId: smartphoneCategory.id,
+            brandId: apple.id,
+            modelName: 'iPhone 13 Pro 128GB',
+            serialNumber: 'IMEI-123456',
+            estimatedValue: 12000000,
+            sourceCustomerName: 'Nguyễn Văn A',
+            sourceCustomerPhone: '0911222333',
+            employeeName: 'Nhân viên Xiaomi TP',
+          },
+          {
+            categoryId: smartphoneCategory.id,
+            brandId: samsung.id,
+            modelName: 'Galaxy S21 Ultra',
+            serialNumber: 'IMEI-789012',
+            estimatedValue: 3000000,
+            sourceCustomerName: 'Trần Thị B',
+            sourceCustomerPhone: '0922333444',
+            employeeName: 'Nhân viên Xiaomi TP',
+          }
+        ]
+      }
+    }
+  })
+
+  const tradeIn2 = await prisma.inboundRequest.create({
+    data: {
+      code: 'INB-TR-002',
+      warehouseId: mainWarehouse.id,
+      status: 'IN_PROGRESS',
+      supplierType: 'CUSTOMER_TRADE_IN',
+      supplierName: 'Xiaomi Store - Quận 7',
+      supplierPhone: '0909876543',
+      receivedDate: new Date(),
+      receivedById: admin.id,
+      totalEstimatedValue: 25000000,
+      notes: 'Máy trade-in từ khách VIP',
+      items: {
+        create: [
+          {
+            categoryId: smartphoneCategory.id,
+            brandId: apple.id,
+            modelName: 'iPhone 14 Pro Max 256GB',
+            serialNumber: 'IMEI-555666',
+            estimatedValue: 25000000,
+            sourceCustomerName: 'Lê Văn C',
+            sourceCustomerPhone: '0933444555',
+            employeeName: 'Nhân viên Xiaomi Q7',
+            isReceived: true,
+            receivedAt: new Date(),
+          }
+        ]
+      }
+    }
+  })
+
+  const tradeIn3 = await prisma.inboundRequest.create({
+    data: {
+      code: 'INB-TR-003',
+      warehouseId: mainWarehouse.id,
+      status: 'COMPLETED',
+      supplierType: 'CUSTOMER_TRADE_IN',
+      supplierName: 'Xiaomi Store - Tân Phú',
+      receivedDate: new Date(Date.now() - 86400000),
+      receivedById: admin.id,
+      totalEstimatedValue: 10000000,
+      totalActualValue: 10000000,
+      items: {
+        create: [
+          {
+            categoryId: smartphoneCategory.id,
+            brandId: samsung.id,
+            modelName: 'Galaxy Z Fold 4',
+            serialNumber: 'IMEI-999888',
+            estimatedValue: 10000000,
+            sourceCustomerName: 'Hoàng Văn D',
+            employeeName: 'Nhân viên Xiaomi TP',
+            isReceived: true,
+            receivedAt: new Date(Date.now() - 86400000),
+          }
+        ]
+      }
     }
   })
 
@@ -571,7 +676,8 @@ async function main() {
 - QC Template: 1 with 5 check items
 - Warehouse: 1 with 2 bin locations
 - Transactions: 4 movement records
-- Trade-In Items: 0
+- Trade-In Requests: 3
+- Trade-In Items: 4
 
 🔧 Ready for Serial-Based Second-Hand Operations!
 `)

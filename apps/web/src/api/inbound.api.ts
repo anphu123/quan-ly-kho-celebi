@@ -235,9 +235,26 @@ export const inboundApi = {
     return response.data;
   },
 
+  async receiveItems(requestId: string): Promise<InboundRequest> {
+    return this.startReceiving(requestId);
+  },
+
   async completeInbound(data: CompleteInbound): Promise<InboundRequest> {
     const response = await api.post('/inbound/complete', data);
     return response.data;
+  },
+
+  async completeQC(requestId: string): Promise<InboundRequest> {
+    const request = await this.getRequestById(requestId);
+    const itemsToComplete = (request as any).items?.map((item: any) => ({
+      inboundItemId: item.id,
+      purchasePrice: Number(item.estimatedValue) || Number(item.otherCosts) || 0,
+    })) || [];
+
+    return this.completeInbound({
+      inboundRequestId: requestId,
+      items: itemsToComplete,
+    });
   },
 
   // ===========================
