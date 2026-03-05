@@ -1,5 +1,61 @@
 # Vercel Deployment Guide
 
+## � Cost: 100% FREE for Small Projects
+
+**Frontend (Vercel):**
+- ✅ FREE Hobby Plan
+- 100 GB bandwidth/month
+- Unlimited deployments
+- Custom domains included
+
+**Backend (Railway):**
+- ⚠️ FREE with $5 credit/month (requires credit card for verification)
+- 500 hours execution time
+- 8GB RAM, 8 vCPUs
+
+**Alternative: Render.com (100% FREE - No Card Required!):**
+- ✅ Completely FREE tier
+- No credit card needed
+- 750 hours/month (enough for 24/7)
+- Auto-sleep after 15min inactivity
+- Slower cold starts (~30s)
+
+**Database Options:**
+- Railway PostgreSQL: Included in $5 credit (requires card)
+- Supabase: ✅ FREE 500MB PostgreSQL (no card!)
+- Neon: ✅ FREE 10GB PostgreSQL (no card!)
+
+🎉 **Recommended FREE Stack (No Card):**
+- Frontend: Vercel
+- Backend: Render.com
+- Database: Supabase or Neon
+- **Total Cost: $0/month, no credit card needed!**
+
+---
+
+## �🚀 Quick Start (Deploy Both from Same Repo)
+
+**You have ONE GitHub repo with both frontend and backend!**
+
+### Step 1: Deploy Backend (Render - 100% FREE, No Card!)
+1. Go to https://render.com → Sign up with GitHub (FREE)
+2. "New" → "Web Service" → Select `anphu123/quan-ly-kho-celebi`
+3. Root Directory: `apps/backend`
+4. Build Command: `pnpm install && pnpm prisma generate && pnpm build`
+5. Start Command: `pnpm start:prod`
+6. Add PostgreSQL database (also FREE on Render)
+7. Copy your Render URL: `https://your-app.onrender.com`
+
+### Step 2: Deploy Frontend (Vercel - 100% FREE)
+1. Go to https://vercel.com/new → Import GitHub repo
+2. Select `anphu123/quan-ly-kho-celebi` (same repo!)
+3. Set `VITE_API_URL` = `https://your-app.onrender.com/api/v1` (from Step 1)
+4. Deploy!
+
+✅ Done! Both deployed 100% FREE - No credit card needed!
+
+---
+
 ## Prerequisites
 
 - Vercel account (sign up at https://vercel.com)
@@ -26,7 +82,8 @@ npm i -g vercel
    - **Install Command**: `pnpm install`
 
 4. Add Environment Variables:
-   - `VITE_API_URL`: Your backend API URL (e.g., `https://your-backend.railway.app/api/v1`)
+   - `VITE_API_URL`: Your Railway backend URL (e.g., `https://xxx.up.railway.app/api/v1`)
+   - **Important:** Get this URL from Railway after deploying backend (see Backend Deployment section below)
 
 5. Click "Deploy"
 
@@ -52,26 +109,85 @@ Set these in Vercel Dashboard → Settings → Environment Variables:
 
 ## Backend Deployment
 
-The frontend needs a backend API. Deploy the NestJS backend separately:
+The frontend needs a backend API. Choose ONE option:
 
-### Option 1: Railway (Recommended)
-1. Go to https://railway.app
-2. Create new project from GitHub
-3. Select `apps/backend` as root directory
-4. Add environment variables from `.env.example`
-5. Deploy
+### Option 1: Render.com (100% FREE - No Credit Card! ⭐ Recommended)
 
-### Option 2: Render
-1. Go to https://render.com
-2. Create new Web Service
-3. Connect GitHub repository
-4. Set Root Directory to `apps/backend`
-5. Build Command: `pnpm install && pnpm build`
-6. Start Command: `pnpm start:prod`
-7. Add environment variables
-8. Deploy
+**Deploy Backend:**
+1. Go to https://render.com (sign up with GitHub - FREE)
+2. "New" → "Web Service" → "Build and deploy from a Git repository"
+3. Select `anphu123/quan-ly-kho-celebi` repo
+4. Configure:
+   - **Name**: `celebi-backend` (or any name)
+   - **Root Directory**: `apps/backend`
+   - **Environment**: `Node`
+   - **Build Command**: `pnpm build:production`
+   - **Start Command**: `pnpm start:prod`
+   - **Instance Type**: FREE (choose Free)
 
-### Option 3: Heroku
+**Add PostgreSQL Database (FREE):**
+1. In Render dashboard, "New" → "PostgreSQL"
+2. Name: `celebi-db`, Plan: FREE
+3. Copy the "Internal Database URL"
+4. Go back to your Web Service → "Environment"
+5. Add environment variables:
+
+```env
+DATABASE_URL=<paste-internal-database-url-here>
+NODE_ENV=production
+JWT_SECRET=your-super-secret-key-change-this
+JWT_REFRESH_SECRET=your-refresh-secret-key
+FRONTEND_URL=https://your-app.vercel.app
+CORS_ORIGINS=https://your-app.vercel.app
+APP_PORT=10000
+```
+
+6. Click "Save Changes" → Render auto-deploys!
+
+**Get Backend URL:**
+- Your backend URL will be: `https://celebi-backend.onrender.com`
+- Copy this - you need it for Vercel!
+
+**⚠️ Note:** Free tier sleeps after 15min inactivity. First request takes ~30s to wake up.
+
+---
+
+### Option 2: Railway (Faster but needs Credit Card)
+1. Go to https://railway.app and login
+2. Click "New Project" → "Deploy from GitHub repo"
+3. Select `anphu123/quan-ly-kho-celebi` (same repo!)
+4. Railway will auto-detect the monorepo
+5. Add environment variables (see below)
+6. Click "Deploy"
+
+**Railway will automatically:**
+- Detect `nixpacks.toml` and `railway.json` configuration
+- Build from `apps/backend` directory
+- Install dependencies with pnpm
+- Run Prisma migrations
+- Start the server
+
+**Required Environment Variables on Railway:**
+```env
+DATABASE_URL=postgresql://user:pass@host:5432/db
+NODE_ENV=production
+JWT_SECRET=your-secret-key
+JWT_REFRESH_SECRET=your-refresh-secret
+FRONTEND_URL=https://your-app.vercel.app
+CORS_ORIGINS=https://your-app.vercel.app
+```
+
+**Add PostgreSQL Database:**
+- In Railway project, click "New" → "Database" → "Add PostgreSQL"
+- Railway auto-sets `DATABASE_URL` for you
+
+**Copy Backend URL:**
+- After deploy, Railway gives you a URL like: `https://xxx.up.railway.app`
+- Copy this URL - you'll need it for Vercel!
+
+---
+
+### ~~Option 3: Heroku~~ (Not recommended - requires credit card)
 ```bash
 cd apps/backend
 heroku create your-app-name
