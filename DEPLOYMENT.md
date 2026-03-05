@@ -41,7 +41,7 @@
 1. Go to https://render.com → Sign up with GitHub (FREE)
 2. "New" → "Web Service" → Select `anphu123/quan-ly-kho-celebi`
 3. Root Directory: `apps/backend`
-4. Build Command: `pnpm install && pnpm prisma generate && pnpm build`
+4. Build Command: `pnpm build-production`
 5. Start Command: `pnpm start:prod`
 6. Add PostgreSQL database (also FREE on Render)
 7. Copy your Render URL: `https://your-app.onrender.com`
@@ -121,7 +121,7 @@ The frontend needs a backend API. Choose ONE option:
    - **Name**: `celebi-backend` (or any name)
    - **Root Directory**: `apps/backend`
    - **Environment**: `Node`
-   - **Build Command**: `pnpm build:production`
+   - **Build Command**: `pnpm build-production` (Render auto-runs pnpm install first)
    - **Start Command**: `pnpm start:prod`
    - **Instance Type**: FREE (choose Free)
 
