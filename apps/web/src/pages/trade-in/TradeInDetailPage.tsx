@@ -37,13 +37,13 @@ export default function TradeInDetailPage() {
     const [isEditing, setIsEditing] = useState(false);
     const [editForm, setEditForm] = useState<any>({});
 
-    const { data: item, isLoading, isError, error } = useQuery({
+    const { data: request, isLoading, isError, error } = useQuery({
         queryKey: ['trade-in-item', id],
         queryFn: () => inboundApi.getRequestById(id!),
         enabled: !!id
     });
 
-    console.log('TradeInDetailPage:', { id, isLoading, isError, error, item });
+    console.log('TradeInDetailPage:', { id, isLoading, isError, error, request, items: request?.items });
 
     if (isLoading) {
         return <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '100vh', color: '#64748b', fontSize: 16 }}>
@@ -54,7 +54,7 @@ export default function TradeInDetailPage() {
         </div>;
     }
 
-    if (isError || !item) {
+    if (isError || !request || !request.items || request.items.length === 0) {
         return <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '100vh', color: '#ef4444', fontSize: 16 }}>
             <div style={{ textAlign: 'center', maxWidth: 500, padding: 20 }}>
                 <div style={{ marginBottom: 12, fontSize: 32 }}>❌</div>
@@ -72,17 +72,22 @@ export default function TradeInDetailPage() {
         </div>;
     }
 
+    // Now safe to destructure - request is guaranteed to exist here
+    // Request-level fields
+    const { code, status, warehouse, createdAt, receivedBy, receivedDate, updatedAt } = request!;
+
+    // Item-level fields (trade-in requests typically have 1 item)
+    const item = request!.items[0];
     const {
-        code, modelName, serialNumber, status,
-        warehouse,
+        modelName, serialNumber,
         notes, contractNumber, purchaseDate, employeeName,
         sourceCustomerName, sourceCustomerPhone, sourceCustomerAddress,
         sourceCustomerIdCard, idCardIssueDate, idCardIssuePlace,
         bankAccount, bankName,
         estimatedValue, otherCosts, topUp, repairCost,
         imageUrl, deviceImages, cccdFrontUrl, cccdBackUrl,
-        createdAt, receivedBy, receivedAt, updatedAt
-    } = item as any;
+        receivedAt
+    } = item;
 
     const currentStatus = statusConfig[status as keyof typeof statusConfig] || statusConfig['REQUESTED'];
     const totalCost = (Number(estimatedValue) || 0) + (Number(otherCosts) || 0) + (Number(topUp) || 0);
@@ -111,7 +116,12 @@ export default function TradeInDetailPage() {
     });
 
     const updateMutation = useMutation({
-        mutationFn: (data: any) => inboundApi.updateRequest(id!, data),
+        mutationFn: (data: any) => {
+            // Update the item-level data using the first item's ID
+            const itemId = request?.items?.[0]?.id;
+            if (!itemId) throw new Error('Item ID not found');
+            return inboundApi.updateItem(itemId, data);
+        },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['trade-in-item', id] });
             setIsEditing(false);
@@ -123,26 +133,25 @@ export default function TradeInDetailPage() {
     });
 
     const handleEdit = () => {
-        const itemData = item as any;
         setEditForm({
-            modelName: itemData.modelName,
-            serialNumber: itemData.serialNumber,
-            notes: itemData.notes,
-            sourceCustomerName: itemData.sourceCustomerName,
-            sourceCustomerPhone: itemData.sourceCustomerPhone,
-            sourceCustomerAddress: itemData.sourceCustomerAddress,
-            sourceCustomerIdCard: itemData.sourceCustomerIdCard,
-            idCardIssueDate: itemData.idCardIssueDate ? itemData.idCardIssueDate.split('T')[0] : '',
-            idCardIssuePlace: itemData.idCardIssuePlace,
-            bankAccount: itemData.bankAccount,
-            bankName: itemData.bankName,
-            contractNumber: itemData.contractNumber,
-            purchaseDate: itemData.purchaseDate ? itemData.purchaseDate.split('T')[0] : '',
-            employeeName: itemData.employeeName,
-            estimatedValue: itemData.estimatedValue || 0,
-            otherCosts: itemData.otherCosts || 0,
-            topUp: itemData.topUp || 0,
-            repairCost: itemData.repairCost || 0,
+            modelName: item.modelName,
+            serialNumber: item.serialNumber,
+            notes: item.notes,
+            sourceCustomerName: item.sourceCustomerName,
+            sourceCustomerPhone: item.sourceCustomerPhone,
+            sourceCustomerAddress: item.sourceCustomerAddress,
+            sourceCustomerIdCard: item.sourceCustomerIdCard,
+            idCardIssueDate: item.idCardIssueDate ? item.idCardIssueDate.split('T')[0] : '',
+            idCardIssuePlace: item.idCardIssuePlace,
+            bankAccount: item.bankAccount,
+            bankName: item.bankName,
+            contractNumber: item.contractNumber,
+            purchaseDate: item.purchaseDate ? item.purchaseDate.split('T')[0] : '',
+            employeeName: item.employeeName,
+            estimatedValue: item.estimatedValue || 0,
+            otherCosts: item.otherCosts || 0,
+            topUp: item.topUp || 0,
+            repairCost: item.repairCost || 0,
         });
         setIsEditing(true);
     };
@@ -674,8 +683,8 @@ export default function TradeInDetailPage() {
                             {parsedDeviceImages.slice(1, 4).map((url: string, idx: number) => (
                                 <ImgPreview key={idx} url={url} label={`Ảnh thiết bị ${idx + 2}`} />
                             ))}
-                            <ImgPreview url={cccdFrontUrl} label="CCCD mặt trước" />
-                            <ImgPreview url={cccdBackUrl} label="CCCD mặt sau" />
+                            <ImgPreview url={cccdFrontUrl || ''} label="CCCD mặt trước" />
+                            <ImgPreview url={cccdBackUrl || ''} label="CCCD mặt sau" />
                         </div>
                     </Card>
 

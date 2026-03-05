@@ -276,43 +276,55 @@ export default function TradeInXiaomiPage() {
         s.name?.toLowerCase().includes('xiaomi')
     );
 
-    const allItemsRaw = inboundData?.data || [];
+    const allRequestsRaw = inboundData?.data || [];
+    
+    console.log('TradeInXiaomiPage - Debug:', {
+        isLoading,
+        hasData: !!inboundData,
+        requestsCount: allRequestsRaw.length,
+        firstRequest: allRequestsRaw[0],
+        firstRequestItems: allRequestsRaw[0]?.items
+    });
 
-    // Client-side flat list of items
+    // Client-side flat list: flatten request → items (each request usually has 1 item for trade-in)
     const allItems: Array<{ item: any; request: any; rowNum: number }> = [];
     let rowNum = 0;
-    allItemsRaw.forEach((item: any) => {
-        rowNum++;
-        // Filter by supplierId
-        if (query.supplierId && item.supplierName !== xiaomiSuppliers.find((s: any) => s.id === query.supplierId)?.name) return;
-        // Filter by date range
-        if (dateFrom && new Date(item.createdAt) < new Date(dateFrom)) return;
-        if (dateTo && new Date(item.createdAt) > new Date(dateTo + 'T23:59:59')) return;
+    allRequestsRaw.forEach((request: any) => {
+        // Filter by supplierId (request-level)
+        if (query.supplierId && request.supplierName !== xiaomiSuppliers.find((s: any) => s.id === query.supplierId)?.name) return;
+        // Filter by date range (request-level)
+        if (dateFrom && new Date(request.createdAt) < new Date(dateFrom)) return;
+        if (dateTo && new Date(request.createdAt) > new Date(dateTo + 'T23:59:59')) return;
 
-        // Advanced filters
-        if (filters.employeeName && !item.employeeName?.toLowerCase().includes(filters.employeeName.toLowerCase())) return;
-        if (filters.modelName && !item.modelName?.toLowerCase().includes(filters.modelName.toLowerCase())) return;
-        if (filters.serialNumber && !item.serialNumber?.toLowerCase().includes(filters.serialNumber.toLowerCase())) return;
-        if (filters.contractNumber && !item.contractNumber?.toLowerCase().includes(filters.contractNumber.toLowerCase())) return;
-        if (filters.notes && !item.notes?.toLowerCase().includes(filters.notes.toLowerCase())) return;
-        if (filters.customerName && !item.sourceCustomerName?.toLowerCase().includes(filters.customerName.toLowerCase())) return;
-        if (filters.customerPhone && !item.sourceCustomerPhone?.includes(filters.customerPhone)) return;
-        if (filters.customerIdCard && !item.sourceCustomerIdCard?.includes(filters.customerIdCard)) return;
-        if (filters.idCardIssuePlace && !item.idCardIssuePlace?.toLowerCase().includes(filters.idCardIssuePlace.toLowerCase())) return;
-        if (filters.customerAddress && !item.sourceCustomerAddress?.toLowerCase().includes(filters.customerAddress.toLowerCase())) return;
-        if (filters.bankAccount && !item.bankAccount?.includes(filters.bankAccount)) return;
-        if (filters.bankName && !item.bankName?.toLowerCase().includes(filters.bankName.toLowerCase())) return;
+        const items = request.items || [];
+        items.forEach((item: any) => {
+            rowNum++;
 
-        // Price range filter
-        const totalPrice = (item.estimatedValue || 0) + (item.otherCosts || 0) + (item.topUp || 0);
-        if (filters.priceFrom && totalPrice < Number(filters.priceFrom)) return;
-        if (filters.priceTo && totalPrice > Number(filters.priceTo)) return;
+            // Advanced filters (item-level fields)
+            if (filters.employeeName && !item.employeeName?.toLowerCase().includes(filters.employeeName.toLowerCase())) return;
+            if (filters.modelName && !item.modelName?.toLowerCase().includes(filters.modelName.toLowerCase())) return;
+            if (filters.serialNumber && !item.serialNumber?.toLowerCase().includes(filters.serialNumber.toLowerCase())) return;
+            if (filters.contractNumber && !item.contractNumber?.toLowerCase().includes(filters.contractNumber.toLowerCase())) return;
+            if (filters.notes && !item.notes?.toLowerCase().includes(filters.notes.toLowerCase())) return;
+            if (filters.customerName && !item.sourceCustomerName?.toLowerCase().includes(filters.customerName.toLowerCase())) return;
+            if (filters.customerPhone && !item.sourceCustomerPhone?.includes(filters.customerPhone)) return;
+            if (filters.customerIdCard && !item.sourceCustomerIdCard?.includes(filters.customerIdCard)) return;
+            if (filters.idCardIssuePlace && !item.idCardIssuePlace?.toLowerCase().includes(filters.idCardIssuePlace.toLowerCase())) return;
+            if (filters.customerAddress && !item.sourceCustomerAddress?.toLowerCase().includes(filters.customerAddress.toLowerCase())) return;
+            if (filters.bankAccount && !item.bankAccount?.includes(filters.bankAccount)) return;
+            if (filters.bankName && !item.bankName?.toLowerCase().includes(filters.bankName.toLowerCase())) return;
 
-        // Item received status filter
-        if (filters.itemReceived === 'true' && !item.isReceived) return;
-        if (filters.itemReceived === 'false' && item.isReceived) return;
+            // Price range filter
+            const totalPrice = (Number(item.estimatedValue) || 0) + (Number(item.otherCosts) || 0) + (Number(item.topUp) || 0);
+            if (filters.priceFrom && totalPrice < Number(filters.priceFrom)) return;
+            if (filters.priceTo && totalPrice > Number(filters.priceTo)) return;
 
-        allItems.push({ item, request: item, rowNum });
+            // Item received status filter
+            if (filters.itemReceived === 'true' && !item.isReceived) return;
+            if (filters.itemReceived === 'false' && item.isReceived) return;
+
+            allItems.push({ item, request, rowNum });
+        });
     });
 
 

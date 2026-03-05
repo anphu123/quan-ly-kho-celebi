@@ -21,6 +21,7 @@ import AdminOpsPage from './pages/admin/AdminOpsPage';
 import TradeInXiaomiPage from './pages/trade-in/TradeInXiaomiPage';
 import CreateTradeInPage from './pages/trade-in/CreateTradeInPage';
 import CreateSingleTradeInPage from './pages/trade-in/CreateSingleTradeInPage';
+import TradeInDetailPage from './pages/trade-in/TradeInDetailPage';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user } = useAuthStore();
@@ -64,6 +65,7 @@ function App() {
         <Route path="trade-in-xiaomi" element={<TradeInXiaomiPage />} />
         <Route path="trade-in-xiaomi/create" element={<CreateTradeInPage />} />
         <Route path="trade-in-xiaomi/create-single" element={<CreateSingleTradeInPage />} />
+        <Route path="trade-in-xiaomi/:id" element={<TradeInDetailPage />} />
         <Route path="admin-ops" element={<SuperAdminRoute><AdminOpsPage /></SuperAdminRoute>} />
 
       </Route>

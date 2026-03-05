@@ -181,12 +181,14 @@ export default function CreateSingleTradeInPage() {
                 supplierType: 'CUSTOMER_TRADE_IN',
                 supplierName: supplier?.name || 'Unknown Store',
                 notes: 'Thu cũ 1 máy lẻ từ Store',
-                ...(item as CreateInboundItem),
-                imageUrl: imageData.deviceUrls[0] || undefined,
-                deviceImages: imageData.deviceUrls.length > 0 ? JSON.stringify(imageData.deviceUrls) : undefined,
-                cccdFrontUrl: imageData.cccdFrontUrl || undefined,
-                cccdBackUrl: imageData.cccdBackUrl || undefined,
-            } as any);
+                items: [{
+                    ...(item as CreateInboundItem),
+                    imageUrl: imageData.deviceUrls[0] || undefined,
+                    deviceImages: imageData.deviceUrls.length > 0 ? JSON.stringify(imageData.deviceUrls) : undefined,
+                    cccdFrontUrl: imageData.cccdFrontUrl || undefined,
+                    cccdBackUrl: imageData.cccdBackUrl || undefined,
+                }],
+            });
         },
         onSuccess: () => navigate('/trade-in-xiaomi'),
         onError: (err: any) => {
