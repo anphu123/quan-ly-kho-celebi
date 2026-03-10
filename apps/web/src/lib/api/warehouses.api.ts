@@ -31,27 +31,28 @@ export interface CreateWarehouseDto {
 export interface UpdateWarehouseDto extends Partial<CreateWarehouseDto> {}
 
 export const warehousesApi = {
-  getAll: async (params?: { page?: number; limit?: number; search?: string }) => {
-    const { data } = await api.get<WarehousesResponse>('/warehouses', { params });
-    return data;
+  getAll: async (params?: { page?: number; limit?: number; search?: string }): Promise<WarehousesResponse> => {
+    const { page = 1, limit = 12, search = '' } = params || {};
+    const response = await api.get('/warehouses', { params: { page, limit, search } });
+    return response.data;
   },
 
-  getById: async (id: string) => {
-    const { data } = await api.get<Warehouse>(`/warehouses/${id}`);
-    return data;
+  getById: async (id: string): Promise<Warehouse> => {
+    const response = await api.get(`/warehouses/${id}`);
+    return response.data;
   },
 
-  create: async (dto: CreateWarehouseDto) => {
-    const { data } = await api.post<Warehouse>('/warehouses', dto);
-    return data;
+  create: async (dto: CreateWarehouseDto): Promise<Warehouse> => {
+    const response = await api.post('/warehouses', dto);
+    return response.data;
   },
 
-  update: async (id: string, dto: UpdateWarehouseDto) => {
-    const { data } = await api.patch<Warehouse>(`/warehouses/${id}`, dto);
-    return data;
+  update: async (id: string, dto: UpdateWarehouseDto): Promise<Warehouse> => {
+    const response = await api.put(`/warehouses/${id}`, dto);
+    return response.data;
   },
 
-  delete: async (id: string) => {
+  delete: async (id: string): Promise<void> => {
     await api.delete(`/warehouses/${id}`);
   },
 };

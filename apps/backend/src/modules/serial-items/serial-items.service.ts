@@ -6,10 +6,14 @@ import {
   UpdateSerialItemDto, 
   SerialItemsQueryDto 
 } from './dto/serial-items.dto';
+import { StockService } from '../stock/stock.service';
 
 @Injectable()
 export class SerialItemsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private stockService: StockService,
+  ) {}
 
   async findAll(query: SerialItemsQueryDto) {
     const {
@@ -428,6 +432,14 @@ export class SerialItemsService {
         performedById: userId,
       },
     });
+
+    // ⭐ Update stock level
+    await this.stockService.updateStockLevelOnStatusChange(
+      id,
+      oldStatus,
+      status,
+      userId,
+    );
 
     return updatedItem;
   }

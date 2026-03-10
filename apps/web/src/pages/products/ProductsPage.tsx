@@ -4,35 +4,34 @@ import {
   Plus, Package, Search, Edit, Trash2, X, Loader2, Filter,
   ChevronRight, Tag, Layers, Database, Zap, AlertTriangle, ScanLine
 } from 'lucide-react';
-import { productsApi, type Product, type CreateProductDto } from '../../lib/api/products.api';
-import { categoriesApi, brandsApi, unitsApi } from '../../lib/api/masterdata.api';
+import { productTemplatesApi, categoriesApi, brandsApi, unitsApi } from '../../api/masterdata.api';
 
 export default function ProductsPage() {
   const queryClient = useQueryClient();
   const [searchTerm, setSearchTerm] = useState('');
   const [page, setPage] = useState(1);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [editingProduct, setEditingProduct] = useState<Product | null>(null);
+  const [editingProduct, setEditingProduct] = useState<any | null>(null);
 
   const { data: productsData, isLoading } = useQuery({
     queryKey: ['products', page, searchTerm],
-    queryFn: () => productsApi.getAll({ page, limit: 12, search: searchTerm }),
+    queryFn: () => productTemplatesApi.getAll({ page, limit: 12, search: searchTerm }),
   });
 
-  const { data: categories = [] } = useQuery({ queryKey: ['categories'], queryFn: categoriesApi.getAll });
-  const { data: brands = [] } = useQuery({ queryKey: ['brands'], queryFn: brandsApi.getAll });
-  const { data: units = [] } = useQuery({ queryKey: ['units'], queryFn: unitsApi.getAll });
+  const { data: categories = [] } = useQuery({ queryKey: ['categories'], queryFn: () => categoriesApi.getAll() });
+  const { data: brands = [] } = useQuery({ queryKey: ['brands'], queryFn: () => brandsApi.getAll() });
+  const { data: units = [] } = useQuery({ queryKey: ['units'], queryFn: () => unitsApi.getAll() });
 
   const deleteMutation = useMutation({
-    mutationFn: productsApi.delete,
+    mutationFn: productTemplatesApi.delete,
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['products'] }),
   });
 
   const formatPrice = (price: number) =>
     new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(price);
 
-  const getTotalStock = (product: Product) =>
-    product.stockLevels?.reduce((sum, l) => sum + l.quantity, 0) || 0;
+  const getTotalStock = (product: any) =>
+    product.stockLevels?.reduce((sum: number, l: any) => sum + l.quantity, 0) || 0;
 
   return (
     <div className="animate-fade-in">
@@ -64,7 +63,7 @@ export default function ProductsPage() {
       {/* Stats */}
       <div className="page-stats-grid">
         {[
-          { label: 'Tổng sản phẩm', value: productsData?.meta.total || 0, icon: Package, color: 'indigo' },
+          { label: 'Tổng sản phẩm', value: productsData?.pagination?.total || 0, icon: Package, color: 'indigo' },
           { label: 'Danh mục', value: categories.length, icon: Layers, color: 'purple' },
           { label: 'Thương hiệu', value: brands.length, icon: Tag, color: 'blue' },
           { label: 'Đơn vị tính', value: units.length, icon: Database, color: 'emerald' },
@@ -77,6 +76,90 @@ export default function ProductsPage() {
             </div>
           </div>
         ))}
+      </div>
+
+      {/* Quick master data management: Categories & Brands */}
+      <div className="table-card" style={{ marginBottom: '1.5rem', marginTop: '0.5rem' }}>
+        <div className="table-toolbar" style={{ marginBottom: '0.75rem' }}>
+          <div className="table-toolbar-title-group">
+            <div className="table-toolbar-icon"><Layers size={16} /></div>
+            <div>
+              <p className="table-toolbar-title">Quản lý danh mục &amp; thương hiệu</p>
+              <p className="table-toolbar-count">
+                <Database size={12} /> {categories.length} danh mục · {brands.length} brand
+              </p>
+            </div>
+          </div>
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+          {/* Categories */}
+          <div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+              <span style={{ fontSize: 13, fontWeight: 700, color: '#0f172a', display: 'flex', alignItems: 'center', gap: 6 }}>
+                <Layers size={14} /> Danh mục
+              </span>
+              <button
+                type="button"
+                className="table-filter-btn"
+                style={{ padding: '0.35rem 0.7rem', fontSize: 12 }}
+                onClick={() => {
+                  alert('Vui lòng tạo danh mục từ trang Quản lý Danh mục');
+                  // const name = window.prompt('Nhập tên danh mục mới:');
+                  // if (!name || !name.trim()) return;
+                  // createCategoryMutation.mutate(name.trim());
+                }}
+              >
+                <Plus size={12} /> Thêm danh mục
+              </button>
+            </div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, maxHeight: 120, overflowY: 'auto' }}>
+              {categories.map((c: any) => (
+                <span
+                  key={c.id}
+                  className="chip"
+                  title={c.code}
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
+                >
+                  {c.name}
+                </span>
+              ))}
+            </div>
+          </div>
+
+          {/* Brands */}
+          <div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+              <span style={{ fontSize: 13, fontWeight: 700, color: '#0f172a', display: 'flex', alignItems: 'center', gap: 6 }}>
+                <Tag size={14} /> Thương hiệu
+              </span>
+              <button
+                type="button"
+                className="table-filter-btn"
+                style={{ padding: '0.35rem 0.7rem', fontSize: 12 }}
+                onClick={() => {
+                  alert('Vui lòng tạo thương hiệu từ trang Quản lý Thương hiệu');
+                  // const name = window.prompt('Nhập tên thương hiệu mới:');
+                  // if (!name || !name.trim()) return;
+                  // createBrandMutation.mutate(name.trim());
+                }}
+              >
+                <Plus size={12} /> Thêm brand
+              </button>
+            </div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, maxHeight: 120, overflowY: 'auto' }}>
+              {brands.map((b: any) => (
+                <span
+                  key={b.id}
+                  className="chip"
+                  title={b.code}
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
+                >
+                  {b.name}
+                </span>
+              ))}
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* Table card */}
@@ -131,9 +214,9 @@ export default function ProductsPage() {
                     </div>
                   </td>
                 </tr>
-              ) : productsData.data.map((product) => {
+              ) : productsData.data.map((product: any) => {
                 const stock = getTotalStock(product);
-                const isLow = stock <= product.minStockLevel;
+                const isLow = stock <= (product.minStockLevel || 0);
                 return (
                   <tr key={product.id}>
                     <td><span className="sku-badge">{product.sku}</span></td>
@@ -150,12 +233,12 @@ export default function ProductsPage() {
                       </span>
                     </td>
                     <td className="right" style={{ fontWeight: 700 }}>
-                      {formatPrice(Number(product.sellingPrice))}
+                      {formatPrice(Number(product.baseRetailPrice || 0))}
                     </td>
                     <td className="center">
                       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.25rem' }}>
                         <span className={`stock-badge ${stock <= 0 ? 'none' : isLow ? 'low' : 'ok'}`}>
-                          {stock} {product.baseUnit?.code || 'U'}
+                          {stock} U
                         </span>
                         {isLow && (
                           <span style={{ fontSize: '0.625rem', fontWeight: 700, color: '#f43f5e', display: 'flex', alignItems: 'center', gap: '0.2rem' }}>
@@ -185,25 +268,25 @@ export default function ProductsPage() {
         </div>
 
         {/* Pagination */}
-        {productsData && productsData.meta.totalPages > 1 && (
+        {productsData && productsData.pagination.totalPages > 1 && (
           <div className="table-pagination">
             <p className="table-pagination-info">
               Hiển thị{' '}
-              <strong>{(page - 1) * 12 + 1}–{Math.min(page * 12, productsData.meta.total)}</strong>
-              {' '}/ {productsData.meta.total} sản phẩm
+              <strong>{(page - 1) * 12 + 1}–{Math.min(page * 12, productsData.pagination.total)}</strong>
+              {' '}/ {productsData.pagination.total} sản phẩm
             </p>
             <div className="table-pagination-btns">
               <button
                 className="table-page-btn"
                 disabled={page === 1}
-                onClick={() => setPage(p => p - 1)}
+                onClick={() => setPage((p: number) => p - 1)}
               >
                 <ChevronRight size={15} style={{ transform: 'rotate(180deg)' }} /> Trước
               </button>
               <button
                 className="table-page-btn"
-                disabled={page === productsData.meta.totalPages}
-                onClick={() => setPage(p => p + 1)}
+                disabled={page === productsData.pagination.totalPages}
+                onClick={() => setPage((p: number) => p + 1)}
               >
                 Tiếp <ChevronRight size={15} />
               </button>
@@ -228,26 +311,52 @@ export default function ProductsPage() {
 }
 
 function ProductModal({ product, categories, brands, units, onClose, onSuccess }: any) {
-  const [formData, setFormData] = useState<CreateProductDto>({
-    sku: product?.sku || '', name: product?.name || '', description: product?.description || '',
-    categoryId: product?.categoryId || '', brandId: product?.brandId || '', baseUnitId: product?.baseUnitId || '',
-    costPrice: product ? Number(product.costPrice) : 0,
-    sellingPrice: product ? Number(product.sellingPrice) : 0,
-    wholesalePrice: product?.wholesalePrice ? Number(product.wholesalePrice) : undefined,
-    minStockLevel: product?.minStockLevel || 0, maxStockLevel: product?.maxStockLevel || 100,
-    reorderPoint: product?.reorderPoint || 10,
+  const queryClient = useQueryClient();
+
+  const [formData, setFormData] = useState<any>({
+    sku: product?.sku || '', 
+    name: product?.name || '', 
+    description: product?.description || '',
+    categoryId: product?.categoryId || '', 
+    brandId: product?.brandId || '', 
+    baseUnitId: product?.baseUnitId || '',
+    baseWholesalePrice: product ? Number(product.baseWholesalePrice || 0) : 0,
+    baseRetailPrice: product ? Number(product.baseRetailPrice || 0) : 0,
   });
 
   const mutation = useMutation({
-    mutationFn: (data: CreateProductDto) => product ? productsApi.update(product.id, data) : productsApi.create(data),
+    mutationFn: (data: any) => product ? productTemplatesApi.update(product.id, data) : productTemplatesApi.create(data),
     onSuccess,
+  });
+
+  const createCategoryMutation = useMutation({
+    mutationFn: (name: string) => categoriesApi.create({ 
+      name, 
+      code: name.toUpperCase().replace(/\s+/g, '_'),
+      productType: 'ELECTRONICS'
+    }),
+    onSuccess: (created) => {
+      queryClient.invalidateQueries({ queryKey: ['categories'] });
+      setFormData((prev: any) => ({ ...prev, categoryId: created.id }));
+    },
+  });
+
+  const createBrandMutation = useMutation({
+    mutationFn: (name: string) => brandsApi.create({ 
+      name, 
+      code: name.toUpperCase().replace(/\s+/g, '_')
+    }),
+    onSuccess: (created) => {
+      queryClient.invalidateQueries({ queryKey: ['brands'] });
+      setFormData((prev: any) => ({ ...prev, brandId: created.id }));
+    },
   });
 
   const handleChange = (e: any) => {
     const { name, value } = e.target;
-    setFormData(prev => ({
+    setFormData((prev: any) => ({
       ...prev,
-      [name]: ['costPrice', 'sellingPrice', 'wholesalePrice', 'minStockLevel', 'maxStockLevel', 'reorderPoint'].includes(name)
+      [name]: ['baseWholesalePrice', 'baseRetailPrice'].includes(name)
         ? (Number(value) || 0) : value
     }));
   };
@@ -299,16 +408,52 @@ function ProductModal({ product, categories, brands, units, onClose, onSuccess }
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
                 <div className="form-field">
                   <label className="form-label">Danh mục</label>
-                  <select name="categoryId" value={formData.categoryId} onChange={handleChange} required className="form-input" style={{ cursor: 'pointer' }}>
+                  <select
+                    name="categoryId"
+                    value={formData.categoryId}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      if (value === '__NEW_CATEGORY__') {
+                        const name = window.prompt('Nhập tên danh mục mới:');
+                        if (!name || !name.trim()) return;
+                        createCategoryMutation.mutate(name.trim());
+                        // reset select back to previous value while creating
+                        e.target.value = formData.categoryId;
+                      } else {
+                        handleChange(e);
+                      }
+                    }}
+                    required
+                    className="form-input"
+                    style={{ cursor: 'pointer' }}
+                  >
                     <option value="">Chọn danh mục</option>
                     {categories.map((c: any) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                    <option value="__NEW_CATEGORY__">+ Khác (thêm danh mục mới)</option>
                   </select>
                 </div>
                 <div className="form-field">
                   <label className="form-label">Thương hiệu</label>
-                  <select name="brandId" value={formData.brandId} onChange={handleChange} className="form-input" style={{ cursor: 'pointer' }}>
+                  <select
+                    name="brandId"
+                    value={formData.brandId}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      if (value === '__NEW_BRAND__') {
+                        const name = window.prompt('Nhập tên thương hiệu mới:');
+                        if (!name || !name.trim()) return;
+                        createBrandMutation.mutate(name.trim());
+                        e.target.value = formData.brandId || '';
+                      } else {
+                        handleChange(e);
+                      }
+                    }}
+                    className="form-input"
+                    style={{ cursor: 'pointer' }}
+                  >
                     <option value="">Chọn thương hiệu</option>
                     {brands.map((b: any) => <option key={b.id} value={b.id}>{b.name}</option>)}
+                    <option value="__NEW_BRAND__">+ Khác (thêm thương hiệu mới)</option>
                   </select>
                 </div>
               </div>
@@ -318,7 +463,7 @@ function ProductModal({ product, categories, brands, units, onClose, onSuccess }
                   {units.map((u: any) => (
                     <button
                       key={u.id} type="button"
-                      onClick={() => setFormData(p => ({ ...p, baseUnitId: u.id }))}
+                      onClick={() => setFormData((p: any) => ({ ...p, baseUnitId: u.id }))}
                       style={{
                         padding: '0.5rem 1rem', borderRadius: '0.75rem', border: '2px solid',
                         borderColor: formData.baseUnitId === u.id ? '#4f46e5' : '#e2e8f0',

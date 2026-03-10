@@ -37,32 +37,33 @@ export interface CreateCustomerDto {
 export interface UpdateCustomerDto extends Partial<CreateCustomerDto> {}
 
 export const customersApi = {
-  getAll: async (params?: { page?: number; limit?: number; search?: string }) => {
-    const { data } = await api.get<CustomersResponse>('/customers', { params });
-    return data;
+  getAll: async (params?: { page?: number; limit?: number; search?: string }): Promise<CustomersResponse> => {
+    const { page = 1, limit = 12, search = '' } = params || {};
+    const response = await api.get('/customers', { params: { page, limit, search } });
+    return response.data;
   },
 
-  getById: async (id: string) => {
-    const { data } = await api.get<Customer>(`/customers/${id}`);
-    return data;
+  getById: async (id: string): Promise<Customer> => {
+    const response = await api.get(`/customers/${id}`);
+    return response.data;
   },
 
-  create: async (dto: CreateCustomerDto) => {
-    const { data } = await api.post<Customer>('/customers', dto);
-    return data;
+  create: async (dto: CreateCustomerDto): Promise<Customer> => {
+    const response = await api.post('/customers', dto);
+    return response.data;
   },
 
-  update: async (id: string, dto: UpdateCustomerDto) => {
-    const { data } = await api.patch<Customer>(`/customers/${id}`, dto);
-    return data;
+  update: async (id: string, dto: UpdateCustomerDto): Promise<Customer> => {
+    const response = await api.put(`/customers/${id}`, dto);
+    return response.data;
   },
 
-  delete: async (id: string) => {
+  delete: async (id: string): Promise<void> => {
     await api.delete(`/customers/${id}`);
   },
 
-  findByPhone: async (phone: string) => {
-    const { data } = await api.get<Customer>(`/customers/phone/${phone}`);
-    return data;
+  findByPhone: async (phone: string): Promise<Customer | null> => {
+    const response = await api.get('/customers', { params: { search: phone, limit: 1 } });
+    return response.data.data[0] || null;
   },
 };

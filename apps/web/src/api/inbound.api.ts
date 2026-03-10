@@ -244,17 +244,9 @@ export const inboundApi = {
     return response.data;
   },
 
-  async completeQC(requestId: string): Promise<InboundRequest> {
-    const request = await this.getRequestById(requestId);
-    const itemsToComplete = (request as any).items?.map((item: any) => ({
-      inboundItemId: item.id,
-      purchasePrice: Number(item.estimatedValue) || Number(item.otherCosts) || 0,
-    })) || [];
-
-    return this.completeInbound({
-      inboundRequestId: requestId,
-      items: itemsToComplete,
-    });
+  async completeQC(requestId: string, notes?: string): Promise<InboundRequest> {
+    const response = await api.post(`/inbound/requests/${requestId}/complete-qc`, { notes });
+    return response.data;
   },
 
   // ===========================

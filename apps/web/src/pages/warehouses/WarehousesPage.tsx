@@ -112,7 +112,7 @@ export default function WarehousesPage() {
             {warehousesData.data.map((warehouse) => {
               const warehouseInventory = inventoryStats?.filter(item => item.warehouseId === warehouse.id) || [];
               const totalItems = warehouseInventory.length;
-              const totalValue = warehouseInventory.reduce((sum, item) => sum + (item.purchasePrice || item.suggestedPrice || 0), 0);
+              const totalValue = warehouseInventory.reduce((sum, item) => sum + (Number(item.purchasePrice) || Number(item.suggestedPrice) || 0), 0);
 
               return (
                 <div key={warehouse.id} className="page-stat-card" style={{ flexDirection: 'column', alignItems: 'stretch', padding: '1.5rem', transition: 'transform 0.2s, box-shadow 0.2s', gap: 0, border: '2px solid transparent' }}

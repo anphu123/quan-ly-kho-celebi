@@ -130,6 +130,57 @@ export class InboundController {
   // RECEIVING WORKFLOW ENDPOINTS
   // ===========================
 
+  @Post('requests/:id/receive-items')
+  @ApiOperation({ summary: 'Mark items as received (simple workflow)' })
+  @ApiResponse({ status: 200, description: 'Items marked as received' })
+  @ApiParam({ name: 'id', description: 'Inbound request ID' })
+  async receiveItems(
+    @Param('id') id: string,
+    @CurrentUser() user: any,
+  ) {
+    // Simple workflow: just mark as received, move to IN_PROGRESS
+    return this.inboundService.startReceivingProcess(id, user.id);
+  }
+
+  @Post('requests/:id/complete-qc')
+  @ApiOperation({ summary: 'Complete QC and create serial items (simplified)' })
+  @ApiResponse({ status: 200, description: 'QC completed and items created' })
+  @ApiParam({ name: 'id', description: 'Inbound request ID' })
+  async completeQCSimple(
+    @Param('id') id: string,
+    @CurrentUser() user: any,
+    @Body() body?: { notes?: string },
+  ) {
+    // Get the request with items
+    const request = await this.inboundService.getInboundRequestById(id);
+    
+    // Auto-generate complete data for all items
+    const items = (request as any).items.map((item: any) => {
+      const estimatedValue = Number(item.estimatedValue) || 0;
+      const otherCosts = Number(item.otherCosts) || 0;
+      const topUp = Number(item.topUp) || 0;
+      const purchasePrice = Math.max(estimatedValue + otherCosts + topUp, 1000);
+      
+      return {
+        inboundItemId: item.id,
+        serialNumber: item.serialNumber || null,
+        condition: item.condition || item.notes || 'Đã kiểm tra',
+        purchasePrice: Math.round(purchasePrice * 100) / 100,
+        binLocation: null,
+        notes: item.notes || null,
+        customAttributes: [],
+      };
+    });
+    
+    const dto: CompleteInboundDto = {
+      inboundRequestId: id,
+      items,
+      notes: body?.notes,
+    };
+    
+    return this.inboundService.completeInboundRequest(dto, user.id);
+  }
+
   @Post('requests/:id/start-receiving')
   @ApiOperation({ summary: 'Start receiving process for inbound request' })
   @ApiResponse({ status: 200, description: 'Receiving process started' })

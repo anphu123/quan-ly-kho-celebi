@@ -40,27 +40,28 @@ export interface CreateSupplierDto {
 export interface UpdateSupplierDto extends Partial<CreateSupplierDto> {}
 
 export const suppliersApi = {
-  getAll: async (params?: { page?: number; limit?: number; search?: string }) => {
-    const { data } = await api.get<SuppliersResponse>('/suppliers', { params });
-    return data;
+  getAll: async (params?: { page?: number; limit?: number; search?: string }): Promise<SuppliersResponse> => {
+    const { page = 1, limit = 12, search = '' } = params || {};
+    const response = await api.get('/suppliers', { params: { page, limit, search } });
+    return response.data;
   },
 
-  getById: async (id: string) => {
-    const { data } = await api.get<Supplier>(`/suppliers/${id}`);
-    return data;
+  getById: async (id: string): Promise<Supplier> => {
+    const response = await api.get(`/suppliers/${id}`);
+    return response.data;
   },
 
-  create: async (dto: CreateSupplierDto) => {
-    const { data } = await api.post<Supplier>('/suppliers', dto);
-    return data;
+  create: async (dto: CreateSupplierDto): Promise<Supplier> => {
+    const response = await api.post('/suppliers', dto);
+    return response.data;
   },
 
-  update: async (id: string, dto: UpdateSupplierDto) => {
-    const { data } = await api.patch<Supplier>(`/suppliers/${id}`, dto);
-    return data;
+  update: async (id: string, dto: UpdateSupplierDto): Promise<Supplier> => {
+    const response = await api.put(`/suppliers/${id}`, dto);
+    return response.data;
   },
 
-  delete: async (id: string) => {
+  delete: async (id: string): Promise<void> => {
     await api.delete(`/suppliers/${id}`);
   },
 };

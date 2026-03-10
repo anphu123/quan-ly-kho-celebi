@@ -71,7 +71,7 @@ export default function WarehouseDetailPage() {
     }, {} as Record<string, number>);
 
     const inStockCount = allItems.filter(i => IN_STOCK_STATUSES.includes(i.status)).length;
-    const totalValue = allItems.reduce((s, i) => s + (i.currentCostPrice || 0), 0);
+    const totalValue = allItems.reduce((s, i) => s + (Number(i.currentCostPrice) || 0), 0);
 
     // Filter for display
     const filtered = allItems.filter(item => {

@@ -19,6 +19,7 @@ const operations = [
   { name: 'POS Bán hàng', href: '/pos', icon: MonitorPlay, external: true },
   { name: 'Đơn bán (Sales)', href: '/sales', icon: Receipt },
   { name: 'Tồn kho', href: '/inventory', icon: Store },
+  { name: 'Tồn kho tổng hợp', href: '/stock/levels', icon: BarChart3 },
   { name: 'Nhập kho (Inbound)', href: '/inbound', icon: ArrowDownLeft },
   { name: 'Xuất kho (Outbound)', href: '/outbound', icon: FileOutput },
   { name: 'Trade-in Xiaomi', href: '/trade-in-xiaomi', icon: Smartphone },

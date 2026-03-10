@@ -329,9 +329,28 @@ export default function TradeInXiaomiPage() {
 
 
     const pagination = inboundData?.pagination || { total: 0, page: 1, totalPages: 1 };
-    const totalValue = allItems.reduce((a, { item }) => a + (Number(item.estimatedValue) || 0) + (Number(item.otherCosts) || 0) + (Number(item.topUp) || 0), 0);
-    const pendingCount = allItems.filter(({ request }) => request.status === 'REQUESTED').length;
-    const completedCount = allItems.filter(({ request }) => request.status === 'COMPLETED').length;
+    const totalValue = allItems.reduce(
+        (a, { item }) => a + (Number(item.estimatedValue) || 0) + (Number(item.otherCosts) || 0) + (Number(item.topUp) || 0),
+        0,
+    );
+
+    const pendingItems = allItems.filter(({ request }) => request.status === 'REQUESTED');
+    const inProgressItems = allItems.filter(({ request }) => request.status === 'IN_PROGRESS');
+    const completedItems = allItems.filter(({ request }) => request.status === 'COMPLETED');
+
+    const pendingCount = pendingItems.length;
+    const completedCount = completedItems.length;
+
+    const pendingValue = pendingItems.reduce(
+        (sum, { item }) => sum + (Number(item.estimatedValue) || 0) + (Number(item.otherCosts) || 0) + (Number(item.topUp) || 0),
+        0,
+    );
+    const completedValue = completedItems.reduce(
+        (sum, { item }) => sum + (Number(item.estimatedValue) || 0) + (Number(item.otherCosts) || 0) + (Number(item.topUp) || 0),
+        0,
+    );
+    const inProgressCount = inProgressItems.length;
+
     const totalPages = pagination.totalPages || 1;
 
 
@@ -366,7 +385,7 @@ export default function TradeInXiaomiPage() {
                 {[
                     { label: 'Tổng thiết bị', val: allItems.length, icon: Smartphone, grad: 'linear-gradient(135deg,#6366f1,#8b5cf6)', shadow: 'rgba(99,102,241,.25)' },
                     { label: 'Chờ nhận hàng', val: pendingCount, icon: Clock, grad: 'linear-gradient(135deg,#f59e0b,#f97316)', shadow: 'rgba(245,158,11,.25)' },
-                    { label: 'Đã hoàn tất', val: completedCount, icon: BadgeCheck, grad: 'linear-gradient(135deg,#10b981,#059669)', shadow: 'rgba(16,185,129,.25)' },
+                    { label: 'Đang QC', val: inProgressCount, icon: ClipboardCheck, grad: 'linear-gradient(135deg,#0ea5e9,#38bdf8)', shadow: 'rgba(14,165,233,.25)' },
                     { label: 'Tổng giá trị', val: totalValue > 0 ? `${fmt(totalValue)} đ` : '—', icon: DollarSign, grad: 'linear-gradient(135deg,#ec4899,#f43f5e)', shadow: 'rgba(236,72,153,.25)' },
                 ].map(s => (
                     <div key={s.label} style={{ background: '#fff', borderRadius: 16, padding: '20px 22px', boxShadow: '0 2px 12px rgba(0,0,0,.06)', display: 'flex', alignItems: 'center', gap: 16, border: '1px solid #f1f5f9' }}>
@@ -379,6 +398,19 @@ export default function TradeInXiaomiPage() {
                         </div>
                     </div>
                 ))}
+            </div>
+
+            {/* Extra summary for "Chờ nhận hàng" & "Đã nhập kho" */}
+            <div style={{ display: 'flex', gap: 12, marginTop: 4, fontSize: 12, color: '#64748b', flexWrap: 'wrap' }}>
+                <span>
+                    <strong style={{ color: '#f97316' }}>Chờ nhận:</strong>{' '}
+                    {isLoading ? '—' : `${pendingCount} máy · ${pendingValue > 0 ? fmt(pendingValue) + ' đ' : '0 đ'}`}
+                </span>
+                <span>·</span>
+                <span>
+                    <strong style={{ color: '#16a34a' }}>Đã nhập kho:</strong>{' '}
+                    {isLoading ? '—' : `${completedCount} máy · ${completedValue > 0 ? fmt(completedValue) + ' đ' : '0 đ'}`}
+                </span>
             </div>
 
             {/* ── Table Card ── */}
@@ -607,18 +639,29 @@ export default function TradeInXiaomiPage() {
                                     const rowBg = i % 2 === 0 ? '#fff' : '#fafaff';
                                     const isLoading = actionLoadingId === request.id;
                                     return (
-                                        <tr key={item.id} style={{ borderBottom: '1px solid #f1f5f9', background: rowBg, transition: 'background .1s' }}
+                                        <tr
+                                            key={item.id}
+                                            style={{ borderBottom: '1px solid #f1f5f9', background: rowBg, transition: 'background .1s', cursor: 'pointer' }}
                                             onMouseEnter={e => (e.currentTarget.style.background = '#f0f4ff')}
                                             onMouseLeave={e => (e.currentTarget.style.background = rowBg)}
+                                            onClick={() => navigate(`/trade-in-xiaomi/${request.id}`)}
                                         >
                                             {/* Sticky left: # */}
                                             <td style={{ ...stickyLeft(0), padding: '10px 12px', color: '#94a3b8', fontWeight: 700, fontSize: 12, whiteSpace: 'nowrap' }}>{rn}</td>
                                             {/* Sticky left: Ảnh */}
                                             <td style={{ ...stickyLeft(40), padding: '10px 12px', whiteSpace: 'nowrap' }}>
                                                 {item.imageUrl ? (
-                                                    <img src={item.imageUrl} alt="device" style={{ width: 40, height: 40, borderRadius: 6, objectFit: 'cover', border: '1px solid #e2e8f0', cursor: 'pointer' }} onClick={() => setEditingItem(item)} />
+                                                    <img
+                                                        src={item.imageUrl}
+                                                        alt="device"
+                                                        style={{ width: 40, height: 40, borderRadius: 6, objectFit: 'cover', border: '1px solid #e2e8f0', cursor: 'pointer' }}
+                                                        onClick={(e) => { e.stopPropagation(); setEditingItem(item); }}
+                                                    />
                                                 ) : (
-                                                    <div style={{ width: 40, height: 40, borderRadius: 6, background: '#f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }} onClick={() => setEditingItem(item)}>
+                                                    <div
+                                                        style={{ width: 40, height: 40, borderRadius: 6, background: '#f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
+                                                        onClick={(e) => { e.stopPropagation(); setEditingItem(item); }}
+                                                    >
                                                         <ImageIcon size={16} color="#94a3b8" />
                                                     </div>
                                                 )}
@@ -666,7 +709,7 @@ export default function TradeInXiaomiPage() {
                                                 <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
                                                     {request.status === 'REQUESTED' && (
                                                         <button
-                                                            onClick={() => receiveItemsMutation.mutate(request.id)}
+                                                            onClick={(e) => { e.stopPropagation(); receiveItemsMutation.mutate(request.id); }}
                                                             disabled={isLoading}
                                                             title="Xác nhận đã nhận hàng"
                                                             style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '5px 10px', borderRadius: 7, border: 'none', background: 'linear-gradient(135deg,#3b82f6,#2563eb)', color: '#fff', fontSize: 11, fontWeight: 700, cursor: isLoading ? 'wait' : 'pointer', opacity: isLoading ? 0.7 : 1 }}>
@@ -676,7 +719,7 @@ export default function TradeInXiaomiPage() {
                                                     )}
                                                     {request.status === 'IN_PROGRESS' && (
                                                         <button
-                                                            onClick={() => completeQCMutation.mutate(request.id)}
+                                                            onClick={(e) => { e.stopPropagation(); completeQCMutation.mutate(request.id); }}
                                                             disabled={isLoading}
                                                             title="Hoàn tất QC và nhập kho"
                                                             style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '5px 10px', borderRadius: 7, border: 'none', background: 'linear-gradient(135deg,#10b981,#059669)', color: '#fff', fontSize: 11, fontWeight: 700, cursor: isLoading ? 'wait' : 'pointer', opacity: isLoading ? 0.7 : 1 }}>
@@ -684,11 +727,15 @@ export default function TradeInXiaomiPage() {
                                                             Nhập kho
                                                         </button>
                                                     )}
-                                                    <button onClick={() => navigate(`/trade-in-xiaomi/${request.id}`)} title="Xem chi tiết"
+                                                    <button
+                                                        onClick={(e) => { e.stopPropagation(); navigate(`/trade-in-xiaomi/${request.id}`); }}
+                                                        title="Xem chi tiết"
                                                         style={{ width: 30, height: 30, borderRadius: 7, background: '#f8fafc', border: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#64748b' }}>
                                                         <Eye size={13} />
                                                     </button>
-                                                    <button onClick={() => setEditingItem(item)} title="Chỉnh sửa"
+                                                    <button
+                                                        onClick={(e) => { e.stopPropagation(); setEditingItem(item); }}
+                                                        title="Chỉnh sửa"
                                                         style={{ width: 30, height: 30, borderRadius: 7, background: '#f0f4ff', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#6366f1' }}>
                                                         <Edit2 size={13} />
                                                     </button>

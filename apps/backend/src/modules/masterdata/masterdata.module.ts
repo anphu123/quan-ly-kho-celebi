@@ -1,27 +1,24 @@
 import { Module } from '@nestjs/common';
 import { PrismaModule } from '../../prisma/prisma.module';
-import { ProductsController } from './products.controller';
-import { CustomersController } from './customers.controller';
+import { CategoriesController } from './categories.controller';
+import { BrandsController } from './brands.controller';
+import { ProductTemplatesController } from './product-templates.controller';
 import { SuppliersController } from './suppliers.controller';
+import { CustomersController } from './customers.controller';
 import { WarehousesController } from './warehouses.controller';
-import { CategoriesController, BrandsController, UnitsController } from './categories.controller';
-import { InventoryController } from './inventory.controller';
 import { MasterdataService } from './masterdata.service';
-import { InventoryService } from './inventory.service';
 
 @Module({
     imports: [PrismaModule],
     controllers: [
-        ProductsController,
-        CustomersController,
-        SuppliersController,
-        WarehousesController,
         CategoriesController,
         BrandsController,
-        UnitsController,
-        InventoryController,
+        ProductTemplatesController,
+        SuppliersController,
+        CustomersController,
+        WarehousesController,
     ],
-    providers: [MasterdataService, InventoryService],
-    exports: [MasterdataService, InventoryService],
+    providers: [MasterdataService],
+    exports: [MasterdataService],
 })
 export class MasterdataModule { }

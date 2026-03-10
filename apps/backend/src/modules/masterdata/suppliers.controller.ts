@@ -1,29 +1,40 @@
-import { Controller, Get, Post, Body, Param, Delete, Query, UseGuards, Patch } from '@nestjs/common';
-import { MasterdataService } from './masterdata.service';
+import { Controller, Get, Post, Put, Delete, Body, Param, Query, UseGuards } from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
+import { MasterdataService } from './masterdata.service';
 
+@ApiTags('Suppliers')
 @Controller('suppliers')
 @UseGuards(JwtAuthGuard)
+@ApiBearerAuth()
 export class SuppliersController {
-    constructor(private readonly masterdataService: MasterdataService) { }
+    constructor(private readonly masterdataService: MasterdataService) {}
 
     @Get()
-    findAll(@Query('page') page: string, @Query('limit') limit: string, @Query('search') search: string) {
-        return this.masterdataService.findAllSuppliers(Number(page) || 1, Number(limit) || 10, search);
+    @ApiOperation({ summary: 'Get all suppliers with pagination' })
+    async findAll(
+        @Query('page') page = 1,
+        @Query('limit') limit = 10,
+        @Query('search') search = ''
+    ) {
+        return this.masterdataService.findAllSuppliers(Number(page), Number(limit), search);
     }
 
     @Post()
-    create(@Body() createDto: any) {
-        return this.masterdataService.createSupplier(createDto);
+    @ApiOperation({ summary: 'Create new supplier' })
+    async create(@Body() data: any) {
+        return this.masterdataService.createSupplier(data);
     }
 
-    @Patch(':id')
-    update(@Param('id') id: string, @Body() updateDto: any) {
-        return this.masterdataService.updateSupplier(id, updateDto);
+    @Put(':id')
+    @ApiOperation({ summary: 'Update supplier' })
+    async update(@Param('id') id: string, @Body() data: any) {
+        return this.masterdataService.updateSupplier(id, data);
     }
 
     @Delete(':id')
-    remove(@Param('id') id: string) {
+    @ApiOperation({ summary: 'Delete supplier' })
+    async delete(@Param('id') id: string) {
         return this.masterdataService.deleteSupplier(id);
     }
 }

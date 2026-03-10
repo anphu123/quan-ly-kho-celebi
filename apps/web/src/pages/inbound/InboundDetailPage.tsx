@@ -79,6 +79,16 @@ export default function InboundDetailPage() {
     const handleSaveQC = () => {
         if (!activeQCItem) return;
 
+        // Nếu chưa nhập IMEI/Serial thật → hỏi có dùng IMEI hệ thống không
+        if (!qcFormData.serialNumber || String(qcFormData.serialNumber).trim() === '') {
+            const ok = confirm(
+                'Thiết bị này hiện chưa có IMEI / Serial.\n' +
+                'Hệ thống sẽ tự sinh một IMEI nội bộ để quản lý tồn kho.\n\n' +
+                'Bạn có chắc chắn muốn tiếp tục dùng IMEI hệ thống?'
+            );
+            if (!ok) return;
+        }
+
         // Convert flat form customAttributes to the array format expected by the API
         const customAttrArray = Object.keys(qcFormData.customAttributes || {}).map(attrId => ({
             attributeId: attrId,

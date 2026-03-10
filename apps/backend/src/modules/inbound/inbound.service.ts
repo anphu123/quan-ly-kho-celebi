@@ -8,10 +8,14 @@ import {
   UpdateInboundItemDto
 } from './dto/inbound.dto';
 import { InboundStatus, SerialStatus, TransactionType } from '@prisma/client';
+import { StockService } from '../stock/stock.service';
 
 @Injectable()
 export class InboundService {
-  constructor(private prisma: PrismaService) { }
+  constructor(
+    private prisma: PrismaService,
+    private stockService: StockService,
+  ) { }
 
   // ===========================
   // INBOUND REQUEST OPERATIONS
@@ -393,7 +397,7 @@ export class InboundService {
 
       const serialItemsCreated = [];
 
-      // Process each item
+      // Process each item (only the items provided in dto.items)
       for (const [_itemId, { inboundItem, receiveItem }] of itemsToProcess) {
         // Generate internal code if no serial number provided
         let internalCode = receiveItem.serialNumber;
@@ -481,6 +485,16 @@ export class InboundService {
             },
           });
 
+          // ⭐ Update stock level
+          await this.stockService.updateStockLevelOnStatusChange(
+            serialItem.id,
+            null, // oldStatus = null (mới tạo)
+            SerialStatus.INCOMING,
+            userId,
+            'INBOUND',
+            request.id,
+          );
+
         } catch (error: any) {
           console.error(`Error creating serial item for inbound item ${receiveItem.inboundItemId}:`, {
             itemId: receiveItem.inboundItemId,
@@ -497,17 +511,35 @@ export class InboundService {
         }
       }
 
-      // Calculate total actual value from processed items
-      const calculatedTotalValue = serialItemsCreated.reduce((sum, item) => sum + Number(item.purchasePrice), 0);
+      // Calculate total actual value from processed items (this batch)
+      const calculatedTotalValue = serialItemsCreated.reduce(
+        (sum, item) => sum + Number(item.purchasePrice),
+        0,
+      );
 
-      // Complete the inbound request
+      // Determine if all items in this request are now received
+      const remainingNotReceived = await tx.inboundItem.count({
+        where: {
+          inboundRequestId: dto.inboundRequestId,
+          isReceived: false,
+        },
+      });
+      const isNowCompleted = remainingNotReceived === 0;
+
+      // Accumulate totalActualValue instead of overwriting (supports partial batches)
+      const previousTotalActual = Number(request.totalActualValue || 0);
+      const newTotalActual = previousTotalActual + calculatedTotalValue;
+
+      // Update the inbound request status:
+      // - If all items received -> COMPLETED
+      // - If some items still pending -> stay IN_PROGRESS
       const updatedRequest = await tx.inboundRequest.update({
         where: { id: dto.inboundRequestId },
         data: {
-          status: InboundStatus.COMPLETED,
-          receivedDate: new Date(),
+          status: isNowCompleted ? InboundStatus.COMPLETED : InboundStatus.IN_PROGRESS,
+          receivedDate: isNowCompleted ? new Date() : request.receivedDate,
           receivedById: userId,
-          totalActualValue: dto.totalActualValue || calculatedTotalValue,
+          totalActualValue: newTotalActual,
           notes: dto.notes || request.notes,
         },
         include: {
@@ -573,19 +605,55 @@ export class InboundService {
   }
 
   private async createProductTemplate(tx: any, inboundItem: any): Promise<string> {
-    // Create a basic product template if none exists
-    const template = await tx.productTemplate.create({
-      data: {
-        sku: `AUTO-${Date.now()}`,
-        name: inboundItem.modelName,
-        categoryId: inboundItem.categoryId,
-        brandId: inboundItem.brandId || null,
-        description: `Auto-generated from inbound item: ${inboundItem.modelName}`,
-      },
-    });
+      // Validate categoryId exists, if not use a default or create one
+      let categoryId = inboundItem.categoryId;
 
-    return template.id;
-  }
+      if (categoryId) {
+        const categoryExists = await tx.category.findUnique({
+          where: { id: categoryId }
+        });
+
+        if (!categoryExists) {
+          console.warn(`Category ${categoryId} not found, will use default category`);
+          categoryId = null;
+        }
+      }
+
+      // If no valid category, find or create a default "Uncategorized" category
+      if (!categoryId) {
+        let defaultCategory = await tx.category.findFirst({
+          where: { code: 'UNCATEGORIZED' }
+        });
+
+        if (!defaultCategory) {
+          defaultCategory = await tx.category.create({
+            data: {
+              code: 'UNCATEGORIZED',
+              name: 'Chưa phân loại',
+              productType: 'ELECTRONICS',
+              trackingMethod: 'SERIAL_BASED',
+              description: 'Default category for auto-generated products',
+            }
+          });
+        }
+
+        categoryId = defaultCategory.id;
+      }
+
+      // Create a basic product template
+      const template = await tx.productTemplate.create({
+        data: {
+          sku: `AUTO-${Date.now()}`,
+          name: inboundItem.modelName,
+          categoryId: categoryId,
+          brandId: inboundItem.brandId || null,
+          description: `Auto-generated from inbound item: ${inboundItem.modelName}`,
+        },
+      });
+
+      return template.id;
+    }
+
 
   // ===========================
   // ANALYTICS & REPORTING

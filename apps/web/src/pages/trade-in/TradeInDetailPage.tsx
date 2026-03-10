@@ -74,7 +74,7 @@ export default function TradeInDetailPage() {
 
     // Now safe to destructure - request is guaranteed to exist here
     // Request-level fields
-    const { code, status, warehouse, createdAt, receivedBy, receivedDate, updatedAt } = request!;
+    const { code, status, warehouse, createdAt, receivedBy, updatedAt } = request!;
 
     // Item-level fields (trade-in requests typically have 1 item)
     const item = request!.items[0];
@@ -86,12 +86,27 @@ export default function TradeInDetailPage() {
         bankAccount, bankName,
         estimatedValue, otherCosts, topUp, repairCost,
         imageUrl, deviceImages, cccdFrontUrl, cccdBackUrl,
-        receivedAt
-    } = item;
+        receivedAt,
+        serialItem,
+    } = item as any;
 
     const currentStatus = statusConfig[status as keyof typeof statusConfig] || statusConfig['REQUESTED'];
     const totalCost = (Number(estimatedValue) || 0) + (Number(otherCosts) || 0) + (Number(topUp) || 0);
-    const parsedDeviceImages = deviceImages ? JSON.parse(deviceImages) : [];
+
+    let parsedDeviceImages: string[] = [];
+    if (Array.isArray(deviceImages)) {
+        parsedDeviceImages = deviceImages as unknown as string[];
+    } else if (typeof deviceImages === 'string' && deviceImages.trim() !== '') {
+        try {
+            const parsed = JSON.parse(deviceImages);
+            if (Array.isArray(parsed)) {
+                parsedDeviceImages = parsed;
+            }
+        } catch (e) {
+            console.error('Invalid deviceImages JSON in TradeInDetailPage', { deviceImages, error: e });
+            parsedDeviceImages = [];
+        }
+    }
 
     const receiveMutation = useMutation({
         mutationFn: () => inboundApi.receiveItems(id!),
@@ -105,13 +120,15 @@ export default function TradeInDetailPage() {
     });
 
     const completeMutation = useMutation({
-        mutationFn: () => inboundApi.completeQC(id!),
+        mutationFn: (notes?: string) => inboundApi.completeQC(id!, notes),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['trade-in-item', id] });
             alert('Đã hoàn tất nhập kho thành công!');
         },
         onError: (err: any) => {
-            alert(err?.response?.data?.message || 'Lỗi khi nhập kho');
+            const errorMsg = err?.response?.data?.message || err?.message || 'Lỗi khi nhập kho';
+            console.error('Complete QC Error:', err);
+            alert('Lỗi nhập kho: ' + errorMsg);
         }
     });
 
@@ -558,7 +575,7 @@ export default function TradeInDetailPage() {
                     )}
                     {status === 'IN_PROGRESS' && (
                         <button
-                            onClick={() => { if (confirm('Hoàn tất kiểm tra và nhập kho thiết bị này?')) completeMutation.mutate() }}
+                            onClick={() => { if (confirm('Hoàn tất kiểm tra và nhập kho thiết bị này?')) completeMutation.mutate(undefined) }}
                             disabled={completeMutation.isPending}
                             style={{
                                 padding: '12px 24px',
@@ -612,7 +629,13 @@ export default function TradeInDetailPage() {
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))', gap: 24 }}>
                         <Card title="Thông tin thiết bị" icon={<Smartphone size={18} />}>
                             <EditableInfoRow label="Thiết bị" fieldName="modelName" value={modelName} />
-                            <EditableInfoRow label="IMEI / Serial" fieldName="serialNumber" value={serialNumber} highlight />
+                            {/* IMEI sản phẩm (người dùng nhập) */}
+                            <EditableInfoRow label="IMEI / Serial (sản phẩm)" fieldName="serialNumber" value={serialNumber} highlight />
+                            {/* IMEI nội bộ hệ thống sinh ra sau khi nhập kho */}
+                            <InfoRow
+                                label="IMEI hệ thống"
+                                value={serialItem?.internalCode || '—'}
+                            />
                             <InfoRow label="Kho nhận" value={warehouse?.name || warehouse?.code} />
                             <EditableInfoRow label="Ghi chú tình trạng" fieldName="notes" value={notes} />
                         </Card>

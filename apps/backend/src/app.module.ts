@@ -6,12 +6,8 @@ import { AuthModule } from './modules/auth/auth.module';
 import { SerialItemsModule } from './modules/serial-items/serial-items.module';
 import { QCInspectionModule } from './modules/qc-inspection/qc-inspection.module';
 import { InboundModule } from './modules/inbound/inbound.module';
-import { AttributesModule } from './modules/attributes/attributes.module';
-import { PosModule } from './modules/pos/pos.module';
-import { SalesModule } from './modules/sales/sales.module';
-import { OutboundModule } from './modules/outbound/outbound.module';
 import { MasterdataModule } from './modules/masterdata/masterdata.module';
-import { UploadModule } from './modules/upload/upload.module';
+import { StockModule } from './modules/stock/stock.module';
 
 @Module({
   imports: [
@@ -37,12 +33,8 @@ import { UploadModule } from './modules/upload/upload.module';
     SerialItemsModule, // ⭐ Serial-based inventory tracking
     QCInspectionModule, // ⭐ Quality control workflow
     InboundModule, // ⭐ Receiving & inbound operations
-    AttributesModule, // ⭐ Custom Attributes (EAV)
-    PosModule, // ⭐ Point of Sale
-    SalesModule, // ⭐ Sales History and Orders
-    OutboundModule, // ⭐ Outbound operations (Returns, Disposals)
-    MasterdataModule, // ⭐ Core Master Data (Products, Customers, etc.)
-    UploadModule, // ⭐ File uploads
+    MasterdataModule, // ⭐ Core Master Data (Categories, Brands, Products)
+    StockModule, // ⭐ Stock Level & Movement Tracking
   ],
 })
 export class AppModule { }
