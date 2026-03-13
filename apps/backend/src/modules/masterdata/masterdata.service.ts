@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 
 @Injectable()
@@ -123,12 +123,18 @@ export class MasterdataService {
         
         if (query?.productType) where.productType = query.productType;
         if (query?.trackingMethod) where.trackingMethod = query.trackingMethod;
+        if (query?.brandId) {
+            where.brandCategories = { some: { brandId: query.brandId } };
+        }
 
         return this.prisma.category.findMany({
             where,
             include: {
                 parent: true,
                 children: true,
+                brandCategories: {
+                    include: { brand: true }
+                },
                 _count: {
                     select: { productTemplates: true }
                 }
@@ -143,6 +149,9 @@ export class MasterdataService {
             include: {
                 parent: true,
                 children: true,
+                brandCategories: {
+                    include: { brand: true }
+                },
                 productTemplates: {
                     take: 10,
                     include: { brand: true }
@@ -154,7 +163,7 @@ export class MasterdataService {
         });
 
         if (!category) {
-            throw new Error('Category not found');
+            throw new NotFoundException('Category not found');
         }
 
         return category;
@@ -167,7 +176,7 @@ export class MasterdataService {
                 where: { id: data.parentId }
             });
             if (!parent) {
-                throw new Error('Parent category not found');
+                throw new BadRequestException('Parent category not found');
             }
         }
 
@@ -176,10 +185,10 @@ export class MasterdataService {
             where: { code: data.code }
         });
         if (existing) {
-            throw new Error('Category code already exists');
+            throw new ConflictException('Category code already exists');
         }
 
-        return this.prisma.category.create({
+        const created = await this.prisma.category.create({
             data: {
                 name: data.name,
                 code: data.code,
@@ -195,6 +204,21 @@ export class MasterdataService {
                 }
             }
         });
+
+        if (data.brandIds?.length) {
+            const brands = await this.prisma.brand.findMany({ where: { id: { in: data.brandIds } } });
+            if (brands.length !== data.brandIds.length) {
+                const found = new Set(brands.map(b => b.id));
+                const missing = data.brandIds.filter((id: string) => !found.has(id));
+                throw new BadRequestException(`Brands not found: ${missing.join(', ')}`);
+            }
+            await this.prisma.brandCategory.createMany({
+                data: data.brandIds.map((brandId: string) => ({ brandId, categoryId: created.id })),
+                skipDuplicates: true
+            });
+        }
+
+        return created;
     }
 
     async updateCategory(id: string, data: any) {
@@ -204,17 +228,26 @@ export class MasterdataService {
         });
 
         if (!category) {
-            throw new Error('Category not found');
+            throw new NotFoundException('Category not found');
+        }
+
+        if (data.code && data.code !== category.code) {
+            const existing = await this.prisma.category.findUnique({
+                where: { code: data.code }
+            });
+            if (existing) {
+                throw new ConflictException('Category code already exists');
+            }
         }
 
         // Don't allow changing trackingMethod if has products
         if (data.trackingMethod && data.trackingMethod !== category.trackingMethod) {
             if (category._count.productTemplates > 0) {
-                throw new Error('Cannot change tracking method for category with existing products');
+                throw new BadRequestException('Cannot change tracking method for category with existing products');
             }
         }
 
-        return this.prisma.category.update({
+        const updated = await this.prisma.category.update({
             where: { id },
             data,
             include: {
@@ -224,6 +257,24 @@ export class MasterdataService {
                 }
             }
         });
+
+        if (data.brandIds) {
+            const brands = await this.prisma.brand.findMany({ where: { id: { in: data.brandIds } } });
+            if (brands.length !== data.brandIds.length) {
+                const found = new Set(brands.map(b => b.id));
+                const missing = data.brandIds.filter((bid: string) => !found.has(bid));
+                throw new BadRequestException(`Brands not found: ${missing.join(', ')}`);
+            }
+            await this.prisma.brandCategory.deleteMany({ where: { categoryId: id } });
+            if (data.brandIds.length > 0) {
+                await this.prisma.brandCategory.createMany({
+                    data: data.brandIds.map((brandId: string) => ({ brandId, categoryId: id })),
+                    skipDuplicates: true
+                });
+            }
+        }
+
+        return updated;
     }
 
     async deleteCategory(id: string) {
@@ -233,11 +284,11 @@ export class MasterdataService {
         });
 
         if (!category) {
-            throw new Error('Category not found');
+            throw new NotFoundException('Category not found');
         }
 
         if (category._count.productTemplates > 0) {
-            throw new Error('Cannot delete category with existing products');
+            throw new ConflictException('Cannot delete category with existing products');
         }
 
         return this.prisma.category.delete({ where: { id } });
@@ -255,10 +306,16 @@ export class MasterdataService {
                 { code: { contains: query.search, mode: 'insensitive' } },
             ];
         }
+        if (query?.categoryId) {
+            where.brandCategories = { some: { categoryId: query.categoryId } };
+        }
 
         return this.prisma.brand.findMany({
             where,
             include: {
+                brandCategories: {
+                    include: { category: true }
+                },
                 _count: {
                     select: { productTemplates: true }
                 }
@@ -271,6 +328,9 @@ export class MasterdataService {
         const brand = await this.prisma.brand.findUnique({
             where: { id },
             include: {
+                brandCategories: {
+                    include: { category: true }
+                },
                 productTemplates: {
                     take: 10,
                     include: { category: true }
@@ -282,7 +342,7 @@ export class MasterdataService {
         });
 
         if (!brand) {
-            throw new Error('Brand not found');
+            throw new NotFoundException('Brand not found');
         }
 
         return brand;
@@ -294,10 +354,10 @@ export class MasterdataService {
             where: { code: data.code }
         });
         if (existing) {
-            throw new Error('Brand code already exists');
+            throw new ConflictException('Brand code already exists');
         }
 
-        return this.prisma.brand.create({
+        const created = await this.prisma.brand.create({
             data: {
                 name: data.name,
                 code: data.code,
@@ -309,6 +369,21 @@ export class MasterdataService {
                 }
             }
         });
+
+        if (data.categoryIds?.length) {
+            const categories = await this.prisma.category.findMany({ where: { id: { in: data.categoryIds } } });
+            if (categories.length !== data.categoryIds.length) {
+                const found = new Set(categories.map(c => c.id));
+                const missing = data.categoryIds.filter((id: string) => !found.has(id));
+                throw new BadRequestException(`Categories not found: ${missing.join(', ')}`);
+            }
+            await this.prisma.brandCategory.createMany({
+                data: data.categoryIds.map((categoryId: string) => ({ brandId: created.id, categoryId })),
+                skipDuplicates: true
+            });
+        }
+
+        return created;
     }
 
     async updateBrand(id: string, data: any) {
@@ -317,10 +392,19 @@ export class MasterdataService {
         });
 
         if (!brand) {
-            throw new Error('Brand not found');
+            throw new NotFoundException('Brand not found');
         }
 
-        return this.prisma.brand.update({
+        if (data.code && data.code !== brand.code) {
+            const existing = await this.prisma.brand.findUnique({
+                where: { code: data.code }
+            });
+            if (existing) {
+                throw new ConflictException('Brand code already exists');
+            }
+        }
+
+        const updated = await this.prisma.brand.update({
             where: { id },
             data,
             include: {
@@ -329,6 +413,24 @@ export class MasterdataService {
                 }
             }
         });
+
+        if (data.categoryIds) {
+            const categories = await this.prisma.category.findMany({ where: { id: { in: data.categoryIds } } });
+            if (categories.length !== data.categoryIds.length) {
+                const found = new Set(categories.map(c => c.id));
+                const missing = data.categoryIds.filter((cid: string) => !found.has(cid));
+                throw new BadRequestException(`Categories not found: ${missing.join(', ')}`);
+            }
+            await this.prisma.brandCategory.deleteMany({ where: { brandId: id } });
+            if (data.categoryIds.length > 0) {
+                await this.prisma.brandCategory.createMany({
+                    data: data.categoryIds.map((categoryId: string) => ({ brandId: id, categoryId })),
+                    skipDuplicates: true
+                });
+            }
+        }
+
+        return updated;
     }
 
     async deleteBrand(id: string) {
@@ -338,11 +440,11 @@ export class MasterdataService {
         });
 
         if (!brand) {
-            throw new Error('Brand not found');
+            throw new NotFoundException('Brand not found');
         }
 
         if (brand._count.productTemplates > 0) {
-            throw new Error('Cannot delete brand with existing products');
+            throw new ConflictException('Cannot delete brand with existing products');
         }
 
         return this.prisma.brand.delete({ where: { id } });
@@ -437,6 +539,17 @@ export class MasterdataService {
             if (!brand) {
                 throw new Error('Brand not found');
             }
+            const binding = await this.prisma.brandCategory.findUnique({
+                where: {
+                    brandId_categoryId: {
+                        brandId: data.brandId,
+                        categoryId: data.categoryId,
+                    }
+                }
+            });
+            if (!binding) {
+                throw new BadRequestException('Brand không thuộc danh mục đã chọn');
+            }
         }
 
         // Check SKU uniqueness
@@ -484,6 +597,19 @@ export class MasterdataService {
         if (data.categoryId && data.categoryId !== product.categoryId) {
             if (product._count.serialItems > 0) {
                 throw new Error('Cannot change category for product with existing serial items');
+            }
+        }
+
+        if (data.brandId || data.categoryId) {
+            const brandId = data.brandId ?? product.brandId;
+            const categoryId = data.categoryId ?? product.categoryId;
+            if (brandId) {
+                const binding = await this.prisma.brandCategory.findUnique({
+                    where: { brandId_categoryId: { brandId, categoryId } }
+                });
+                if (!binding) {
+                    throw new BadRequestException('Brand không thuộc danh mục đã chọn');
+                }
             }
         }
 

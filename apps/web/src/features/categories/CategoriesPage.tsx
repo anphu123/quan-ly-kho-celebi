@@ -3,24 +3,84 @@ import { PageHeader } from '../../components/widgets/PageHeader';
 import { SearchBar } from '../../components/widgets/SearchBar';
 import { CategoryStats } from './components/CategoryStats';
 import { CategoryTable } from './components/CategoryTable';
+import { CategoryModal } from './components/CategoryModal';
 import { useCategories } from './hooks/useCategories';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
+import type { Category, CreateCategoryDto } from '../../api/masterdata.api';
 
 export default function CategoriesPage() {
-  const { categories, isLoading, stats } = useCategories();
+  const location = useLocation();
+  const navigate = useNavigate();
+  const {
+    categories,
+    isLoading,
+    stats,
+    createMutation,
+    updateMutation,
+    deleteMutation
+  } = useCategories();
+
   const [searchTerm, setSearchTerm] = useState('');
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingCategory, setEditingCategory] = useState<Category | null>(null);
+
+  useEffect(() => {
+    const q = new URLSearchParams(location.search).get('q');
+    if (q !== null) setSearchTerm(q);
+  }, [location.search]);
+
+  const getErrorMessage = (error: any) => {
+    const message = error?.response?.data?.message;
+    if (Array.isArray(message)) return message.join(', ');
+    return message || 'Có lỗi xảy ra';
+  };
 
   const filteredCategories = categories.filter(cat =>
     cat.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     cat.code.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const handleEdit = (category: any) => {
-    alert('Chức năng đang phát triển');
+  const handleCreate = async (data: CreateCategoryDto) => {
+    try {
+      await createMutation.mutateAsync(data);
+      setIsModalOpen(false);
+      alert('Tạo danh mục thành công!');
+    } catch (error) {
+      alert(getErrorMessage(error));
+    }
   };
 
-  const handleDelete = (id: string) => {
-    alert('Chức năng đang phát triển');
+  const handleUpdate = async (data: CreateCategoryDto) => {
+    if (!editingCategory) return;
+    try {
+      await updateMutation.mutateAsync({ id: editingCategory.id, data });
+      setIsModalOpen(false);
+      setEditingCategory(null);
+      alert('Cập nhật danh mục thành công!');
+    } catch (error) {
+      alert(getErrorMessage(error));
+    }
+  };
+
+  const handleEdit = (category: Category) => {
+    setEditingCategory(category);
+    setIsModalOpen(true);
+  };
+
+  const handleView = (category: Category) => {
+    navigate(`/categories/${category.id}`);
+  };
+
+  const handleDelete = async (id: string) => {
+    if (window.confirm('Xác nhận xóa danh mục này?')) {
+      try {
+        await deleteMutation.mutateAsync(id);
+        alert('Xóa danh mục thành công!');
+      } catch (error) {
+        alert(getErrorMessage(error));
+      }
+    }
   };
 
   return (
@@ -34,7 +94,10 @@ export default function CategoriesPage() {
         action={{
           label: 'Thêm danh mục',
           icon: Plus,
-          onClick: () => alert('Chức năng đang phát triển'),
+          onClick: () => {
+            setEditingCategory(null);
+            setIsModalOpen(true);
+          },
         }}
       />
 
@@ -53,6 +116,18 @@ export default function CategoriesPage() {
         loading={isLoading}
         onEdit={handleEdit}
         onDelete={handleDelete}
+        onView={handleView}
+      />
+
+      <CategoryModal
+        isOpen={isModalOpen}
+        onClose={() => {
+          setIsModalOpen(false);
+          setEditingCategory(null);
+        }}
+        onSubmit={editingCategory ? handleUpdate : handleCreate}
+        initialData={editingCategory}
+        loading={createMutation.isPending || updateMutation.isPending}
       />
     </div>
   );

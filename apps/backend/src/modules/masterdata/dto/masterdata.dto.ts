@@ -1,4 +1,4 @@
-import { IsString, IsNotEmpty, IsOptional, IsEnum, IsNumber, IsBoolean, Min } from 'class-validator';
+import { IsString, IsNotEmpty, IsOptional, IsEnum, IsNumber, IsBoolean, Min, IsArray } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional, PartialType } from '@nestjs/swagger';
 import { ProductType, TrackingMethod } from '@prisma/client';
 
@@ -35,6 +35,12 @@ export class CreateCategoryDto {
   @IsString()
   @IsOptional()
   parentId?: string;
+
+  @ApiPropertyOptional({ type: [String], example: ['brand-id-1', 'brand-id-2'] })
+  @IsArray()
+  @IsString({ each: true })
+  @IsOptional()
+  brandIds?: string[];
 }
 
 export class UpdateCategoryDto extends PartialType(CreateCategoryDto) {}
@@ -54,6 +60,11 @@ export class CategoryQueryDto {
   @IsEnum(TrackingMethod)
   @IsOptional()
   trackingMethod?: TrackingMethod;
+
+  @ApiPropertyOptional({ example: 'brand-id' })
+  @IsString()
+  @IsOptional()
+  brandId?: string;
 }
 
 // ===========================
@@ -75,6 +86,12 @@ export class CreateBrandDto {
   @IsString()
   @IsOptional()
   logo?: string;
+
+  @ApiPropertyOptional({ type: [String], example: ['category-id-1', 'category-id-2'] })
+  @IsArray()
+  @IsString({ each: true })
+  @IsOptional()
+  categoryIds?: string[];
 }
 
 export class UpdateBrandDto extends PartialType(CreateBrandDto) {}
@@ -84,6 +101,11 @@ export class BrandQueryDto {
   @IsString()
   @IsOptional()
   search?: string;
+
+  @ApiPropertyOptional({ example: 'category-id' })
+  @IsString()
+  @IsOptional()
+  categoryId?: string;
 }
 
 // ===========================

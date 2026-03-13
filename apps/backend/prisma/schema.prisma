@@ -81,6 +81,7 @@ model Category {
   attributeGroups  AttributeGroup[] // Dynamic attributes ⭐ NEW
   qcTemplates      QCTemplate[] // QC checklists ⭐ NEW
   inboundItems     InboundItem[] // Receiving items
+  brandCategories  BrandCategory[] // Brand bindings ⭐ NEW
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -96,11 +97,28 @@ model Brand {
 
   productTemplates ProductTemplate[]
   inboundItems     InboundItem[] // Receiving items
+  brandCategories  BrandCategory[] // Category bindings ⭐ NEW
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@map("brands")
+}
+
+// Brand <-> Category many-to-many (no recursion, explicit mapping)
+model BrandCategory {
+  id         String   @id @default(cuid())
+  brandId    String
+  categoryId String
+  assignedAt DateTime @default(now())
+
+  brand    Brand    @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  category Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  @@unique([brandId, categoryId])
+  @@index([categoryId])
+  @@index([brandId])
+  @@map("brand_categories")
 }
 
 // Product Template (thay cho Product table cũ)

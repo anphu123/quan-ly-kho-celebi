@@ -4,11 +4,49 @@ import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { ConfigService } from '@nestjs/config';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import { join } from 'path';
+import { readFileSync, existsSync } from 'fs';
 import { AppModule } from './app.module';
 
+const loadEnvFile = (filePath: string) => {
+  if (!existsSync(filePath)) return;
+  try {
+    const content = readFileSync(filePath, 'utf-8');
+    content.split(/\r?\n/).forEach((line) => {
+      const trimmed = line.trim();
+      if (!trimmed || trimmed.startsWith('#')) return;
+      const idx = trimmed.indexOf('=');
+      if (idx === -1) return;
+      const key = trimmed.slice(0, idx).trim();
+      let val = trimmed.slice(idx + 1).trim();
+      if ((val.startsWith('\"') && val.endsWith('\"')) || (val.startsWith("'") && val.endsWith("'"))) {
+        val = val.slice(1, -1);
+      }
+      if (!process.env[key]) {
+        process.env[key] = val;
+      }
+    });
+  } catch {
+    // ignore
+  }
+};
+
 async function bootstrap() {
+  const envPath = process.env.ENV_PATH || join(process.cwd(), '.env');
+  loadEnvFile(envPath);
+
+  const httpsKeyPath = process.env.HTTPS_KEY_PATH;
+  const httpsCertPath = process.env.HTTPS_CERT_PATH;
+
+  const httpsOptions = httpsKeyPath && httpsCertPath && existsSync(httpsKeyPath) && existsSync(httpsCertPath)
+    ? {
+      key: readFileSync(httpsKeyPath),
+      cert: readFileSync(httpsCertPath),
+    }
+    : undefined;
+
   const app = await NestFactory.create<NestExpressApplication>(AppModule, {
     bodyParser: true,
+    httpsOptions,
   });
 
   // Increase body size limit for image uploads (50mb)
@@ -20,6 +58,14 @@ async function bootstrap() {
   app.useStaticAssets(uploadDir, { prefix: '/uploads' });
 
   const configService = app.get(ConfigService);
+
+  if (!httpsOptions) {
+    if (!httpsKeyPath || !httpsCertPath) {
+      console.warn('[HTTPS] Disabled: set HTTPS_KEY_PATH and HTTPS_CERT_PATH to enable HTTPS.');
+    } else {
+      console.warn('[HTTPS] Disabled: key/cert file not found. Check HTTPS_KEY_PATH and HTTPS_CERT_PATH.');
+    }
+  }
 
   // Global prefix
   app.setGlobalPrefix('api/v1');
@@ -68,10 +114,13 @@ async function bootstrap() {
   const document = SwaggerModule.createDocument(app, config);
   SwaggerModule.setup('api', app, document);
 
-  const port = configService.get('APP_PORT', 6868);
+  // Render.com provides PORT, fallback to APP_PORT, then default
+  const port = configService.get('PORT') || configService.get('APP_PORT', 6868);
   const host = configService.get('APP_HOST', '0.0.0.0');
 
   await app.listen(port, host);
+
+  const proto = httpsOptions ? 'https' : 'http';
 
   // Get network addresses
   const os = require('os');
@@ -91,9 +140,9 @@ async function bootstrap() {
 ║                                                               ║
 ║   🏪 CELEBI Inventory & POS System                           ║
 ║                                                               ║
-║   ➜  Local:   http://localhost:${port}                           ║
-║   ➜  Network: ${addresses.map(ip => `http://${ip}:${port}`).join('\n║             ')}${addresses.length === 0 ? 'No network interface found' : ''}
-║   📚 API Docs: http://localhost:${port}/api                       ║
+║   ➜  Local:   ${proto}://localhost:${port}                           ║
+║   ➜  Network: ${addresses.map(ip => `${proto}://${ip}:${port}`).join('\n║             ')}${addresses.length === 0 ? 'No network interface found' : ''}
+║   📚 API Docs: ${proto}://localhost:${port}/api                       ║
 ║   🔧 Environment: ${configService.get('NODE_ENV')}                              ║
 ║                                                               ║
 ╚═══════════════════════════════════════════════════════════════╝

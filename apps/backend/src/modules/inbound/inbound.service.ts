@@ -74,6 +74,28 @@ export class InboundService {
       }
     }
 
+    // Validate brand-category binding (if brandId provided)
+    const brandCategoryPairs = dto.items
+      .filter(item => item.brandId && item.categoryId)
+      .map(item => ({ brandId: item.brandId!, categoryId: item.categoryId }));
+    if (brandCategoryPairs.length > 0) {
+      const uniquePairs = new Map<string, { brandId: string; categoryId: string }>();
+      brandCategoryPairs.forEach(p => uniquePairs.set(`${p.brandId}:${p.categoryId}`, p));
+      const pairList = Array.from(uniquePairs.values());
+
+      const linked = await this.prisma.brandCategory.findMany({
+        where: { OR: pairList }
+      });
+
+      if (linked.length !== pairList.length) {
+        const linkedSet = new Set(linked.map(l => `${l.brandId}:${l.categoryId}`));
+        const missing = pairList
+          .filter(p => !linkedSet.has(`${p.brandId}:${p.categoryId}`))
+          .map(p => `${p.brandId}/${p.categoryId}`);
+        throw new BadRequestException(`Brand không thuộc danh mục: ${missing.join(', ')}`);
+      }
+    }
+
     // Create inbound request with items (userId can be used for audit trails later)
     return this.prisma.inboundRequest.create({
       data: {
@@ -140,6 +162,20 @@ export class InboundService {
         { code: { contains: search, mode: 'insensitive' } },
         { supplierName: { contains: search, mode: 'insensitive' } },
         { notes: { contains: search, mode: 'insensitive' } },
+        {
+          items: {
+            some: {
+              OR: [
+                { serialNumber: { contains: search, mode: 'insensitive' as any } },
+                { modelName: { contains: search, mode: 'insensitive' as any } },
+                { contractNumber: { contains: search, mode: 'insensitive' as any } },
+                { sourceCustomerName: { contains: search, mode: 'insensitive' as any } },
+                { sourceCustomerPhone: { contains: search, mode: 'insensitive' as any } },
+                { sourceCustomerIdCard: { contains: search, mode: 'insensitive' as any } },
+              ],
+            },
+          },
+        },
       ];
     }
 
@@ -493,6 +529,7 @@ export class InboundService {
             userId,
             'INBOUND',
             request.id,
+            tx, // Truyền transaction client
           );
 
         } catch (error: any) {
@@ -605,54 +642,73 @@ export class InboundService {
   }
 
   private async createProductTemplate(tx: any, inboundItem: any): Promise<string> {
-      // Validate categoryId exists, if not use a default or create one
-      let categoryId = inboundItem.categoryId;
+    // 1. Xử lý Category
+    let categoryId = inboundItem.categoryId;
+    if (categoryId) {
+      const categoryExists = await tx.category.findUnique({
+        where: { id: categoryId }
+      });
+      if (!categoryExists) categoryId = null;
+    }
 
-      if (categoryId) {
-        const categoryExists = await tx.category.findUnique({
-          where: { id: categoryId }
-        });
-
-        if (!categoryExists) {
-          console.warn(`Category ${categoryId} not found, will use default category`);
-          categoryId = null;
-        }
-      }
-
-      // If no valid category, find or create a default "Uncategorized" category
-      if (!categoryId) {
-        let defaultCategory = await tx.category.findFirst({
-          where: { code: 'UNCATEGORIZED' }
-        });
-
-        if (!defaultCategory) {
-          defaultCategory = await tx.category.create({
-            data: {
-              code: 'UNCATEGORIZED',
-              name: 'Chưa phân loại',
-              productType: 'ELECTRONICS',
-              trackingMethod: 'SERIAL_BASED',
-              description: 'Default category for auto-generated products',
-            }
-          });
-        }
-
-        categoryId = defaultCategory.id;
-      }
-
-      // Create a basic product template
-      const template = await tx.productTemplate.create({
-        data: {
-          sku: `AUTO-${Date.now()}`,
-          name: inboundItem.modelName,
-          categoryId: categoryId,
-          brandId: inboundItem.brandId || null,
-          description: `Auto-generated from inbound item: ${inboundItem.modelName}`,
-        },
+    if (!categoryId) {
+      let defaultCategory = await tx.category.findFirst({
+        where: { code: 'UNCATEGORIZED' }
       });
 
-      return template.id;
+      if (!defaultCategory) {
+        defaultCategory = await tx.category.create({
+          data: {
+            code: 'UNCATEGORIZED',
+            name: 'Chưa phân loại',
+            productType: 'ELECTRONICS',
+            trackingMethod: 'SERIAL_BASED',
+            description: 'Danh mục mặc định cho sản phẩm tự động',
+          }
+        });
+      }
+      categoryId = defaultCategory.id;
     }
+
+    // 2. Xử lý Brand (Bắt buộc trong schema nhưng có thể null trong InboundItem)
+    let brandId = inboundItem.brandId;
+    if (brandId) {
+      const brandExists = await tx.brand.findUnique({
+        where: { id: brandId }
+      });
+      if (!brandExists) brandId = null;
+    }
+
+    if (!brandId) {
+      let defaultBrand = await tx.brand.findFirst({
+        where: { code: 'GENERIC' }
+      });
+
+      if (!defaultBrand) {
+        defaultBrand = await tx.brand.create({
+          data: {
+            code: 'GENERIC',
+            name: 'Khác / Không rõ',
+          }
+        });
+      }
+      brandId = defaultBrand.id;
+    }
+
+    // 3. Tạo Product Template với SKU duy nhất
+    const randomSuffix = Math.random().toString(36).substring(2, 7).toUpperCase();
+    const template = await tx.productTemplate.create({
+      data: {
+        sku: `AUTO-${Date.now()}-${randomSuffix}`,
+        name: inboundItem.modelName || 'Sản phẩm mới',
+        categoryId: categoryId,
+        brandId: brandId,
+        description: `Tự động tạo từ đơn nhập: ${inboundItem.modelName}`,
+      },
+    });
+
+    return template.id;
+  }
 
 
   // ===========================

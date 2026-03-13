@@ -1506,6 +1506,8 @@ body {
   padding: 2rem 1.25rem;
   transition: transform 0.3s ease;
   transform: translateX(-100%);
+  overflow: hidden;
+  min-height: 0;
 }
 
 @media (min-width: 1024px) {
@@ -1516,6 +1518,14 @@ body {
 
 .sidebar.open {
   transform: translateX(0);
+}
+
+/* Scrollable sidebar content */
+.sidebar-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding-right: 0.25rem;
 }
 
 /* Sidebar brand */
@@ -1564,7 +1574,6 @@ body {
 
 /* Nav */
 .sidebar-nav {
-  flex: 1;
   display: flex;
   flex-direction: column;
   gap: 0.25rem;
@@ -1870,6 +1879,7 @@ body {
 /* Page content */
 .app-content {
   flex: 1;
+  width: 100%;
   padding: 2rem 1.5rem;
 }
 
@@ -1880,6 +1890,7 @@ body {
 }
 
 .app-content-inner {
+  width: 100%;
   max-width: 90rem;
   margin: 0 auto;
 }
@@ -2725,4 +2736,36 @@ body {
 
 .section-accent.amber {
   background: #f59e0b;
+}
+
+/* ============================================================
+   PRINT MEDIA - For Barcode Label Printer
+   ============================================================ */
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  
+  .print-only-zone, .print-only-zone * {
+    visibility: visible;
+  }
+  
+  .print-only-zone {
+    position: fixed !important;
+    left: 0;
+    top: 0;
+    margin: 0 !important;
+    padding: 2mm !important;
+    border: none !important;
+    box-shadow: none !important;
+    background: transparent !important;
+    width: 52.5mm !important;
+    height: 37mm !important;
+  }
+
+  /* Kích thước giấy khi in label 1/4 A7 xoay ngang */
+  @page {
+    size: 52.5mm 37mm;
+    margin: 0;
+  }
 }

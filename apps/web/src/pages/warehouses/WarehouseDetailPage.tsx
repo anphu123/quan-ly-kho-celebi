@@ -224,7 +224,7 @@ export default function WarehouseDetailPage() {
                     <Search size={15} style={{ position: 'absolute', left: '0.875rem', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8', pointerEvents: 'none' }} />
                     <input
                         type="text"
-                        placeholder="Tìm theo tên sản phẩm, mã nội bộ, serial..."
+                        placeholder="Tìm theo tên sản phẩm, mã nội bộ, số serial..."
                         value={search}
                         onChange={e => setSearch(e.target.value)}
                         className="table-search"
@@ -257,7 +257,7 @@ export default function WarehouseDetailPage() {
                         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                             <thead>
                                 <tr style={{ background: '#f8fafc', borderBottom: '1px solid #f1f5f9' }}>
-                                    {['Sản phẩm', 'Mã nội bộ', 'Serial', 'Grade', 'Trạng thái', 'Vị trí', 'Giá vốn'].map(h => (
+                                    {['Sản phẩm', 'Mã nội bộ', 'Serial/IMEI', 'Phân hạng', 'Trạng thái', 'Vị trí', 'Giá vốn'].map(h => (
                                         <th key={h} style={{ padding: '0.75rem 1rem', textAlign: 'left', fontSize: '0.6875rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.06em', whiteSpace: 'nowrap' }}>{h}</th>
                                     ))}
                                 </tr>
@@ -288,7 +288,7 @@ export default function WarehouseDetailPage() {
                                             <td style={{ padding: '0.875rem 1rem' }}>
                                                 {item.grade ? (
                                                     <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#7c3aed', background: '#f5f3ff', padding: '0.125rem 0.5rem', borderRadius: '0.375rem' }}>
-                                                        {item.grade.replace('GRADE_', 'G').replace('_', '+')}
+                                                        {item.grade.replace('GRADE_', 'H').replace('_', '+')}
                                                     </span>
                                                 ) : <span style={{ color: '#cbd5e1' }}>—</span>}
                                             </td>
@@ -392,7 +392,7 @@ function SerialItemModal({ item, onClose, formatCurrency }: { item: any; onClose
                         </span>
                         {item.grade && (
                             <span style={{ padding: '0.375rem 0.875rem', borderRadius: '99px', fontSize: '0.75rem', fontWeight: 800, background: '#f5f3ff', color: '#7c3aed', border: '1px solid #e9d5ff' }}>
-                                {item.grade.replace('GRADE_', 'Grade ').replace('_', '+')}
+                                {item.grade.replace('GRADE_', 'Hạng ').replace('_', '+')}
                             </span>
                         )}
                     </div>

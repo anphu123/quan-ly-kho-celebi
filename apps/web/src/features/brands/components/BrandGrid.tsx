@@ -7,9 +7,10 @@ interface BrandGridProps {
   loading: boolean;
   onEdit?: (brand: Brand) => void;
   onDelete?: (id: string) => void;
+  onView?: (brand: Brand) => void;
 }
 
-export function BrandGrid({ brands, loading, onEdit, onDelete }: BrandGridProps) {
+export function BrandGrid({ brands, loading, onEdit, onDelete, onView }: BrandGridProps) {
   if (loading) {
     return (
       <div style={{ textAlign: 'center', padding: '3rem', color: '#94a3b8' }}>
@@ -39,6 +40,7 @@ export function BrandGrid({ brands, loading, onEdit, onDelete }: BrandGridProps)
           brand={brand}
           onEdit={onEdit}
           onDelete={onDelete}
+          onView={onView}
         />
       ))}
     </div>

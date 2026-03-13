@@ -6,6 +6,7 @@ export interface Category {
   code: string;
   description?: string;
   parentId?: string;
+  productTemplates?: Array<{ id: string; name: string }>;
   createdAt: string;
   updatedAt: string;
 }
@@ -15,6 +16,7 @@ export interface Brand {
   name: string;
   code: string;
   logo?: string;
+  productTemplates?: Array<{ id: string; name: string }>;
   createdAt: string;
   updatedAt: string;
 }
@@ -29,17 +31,17 @@ export interface UnitOfMeasure {
 }
 
 export const categoriesApi = {
-  getAll: async () => {
-    const { data } = await api.get<Category[]>('/categories');
+  getAll: async (params?: { search?: string; productType?: string; trackingMethod?: string; brandId?: string }) => {
+    const { data } = await api.get<Category[]>('/categories', { params });
     return data;
   },
 
-  create: async (payload: { name: string; code?: string; description?: string; parentId?: string }) => {
+  create: async (payload: { name: string; code?: string; description?: string; parentId?: string; brandIds?: string[] }) => {
     const { data } = await api.post<Category>('/categories', payload);
     return data;
   },
 
-  update: async (id: string, payload: { name?: string; code?: string; description?: string; parentId?: string }) => {
+  update: async (id: string, payload: { name?: string; code?: string; description?: string; parentId?: string; brandIds?: string[] }) => {
     const { data } = await api.put<Category>(`/categories/${id}`, payload);
     return data;
   },
@@ -50,17 +52,17 @@ export const categoriesApi = {
 };
 
 export const brandsApi = {
-  getAll: async () => {
-    const { data } = await api.get<Brand[]>('/brands');
+  getAll: async (params?: { search?: string; categoryId?: string }) => {
+    const { data } = await api.get<Brand[]>('/brands', { params });
     return data;
   },
 
-  create: async (payload: { name: string; code?: string; logo?: string }) => {
+  create: async (payload: { name: string; code?: string; logo?: string; categoryIds?: string[] }) => {
     const { data } = await api.post<Brand>('/brands', payload);
     return data;
   },
 
-  update: async (id: string, payload: { name?: string; code?: string; logo?: string }) => {
+  update: async (id: string, payload: { name?: string; code?: string; logo?: string; categoryIds?: string[] }) => {
     const { data } = await api.put<Brand>(`/brands/${id}`, payload);
     return data;
   },

@@ -45,11 +45,8 @@ export function useBrands() {
     error,
     stats,
     refetch,
-    createBrand: createMutation.mutate,
-    updateBrand: updateMutation.mutate,
-    deleteBrand: deleteMutation.mutate,
-    isCreating: createMutation.isPending,
-    isUpdating: updateMutation.isPending,
-    isDeleting: deleteMutation.isPending,
+    createMutation,
+    updateMutation,
+    deleteMutation,
   };
 }

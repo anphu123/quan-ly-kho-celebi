@@ -7,9 +7,10 @@ interface CategoryTableProps {
   loading: boolean;
   onEdit?: (category: Category) => void;
   onDelete?: (id: string) => void;
+  onView?: (category: Category) => void;
 }
 
-export function CategoryTable({ categories, loading, onEdit, onDelete }: CategoryTableProps) {
+export function CategoryTable({ categories, loading, onEdit, onDelete, onView }: CategoryTableProps) {
   if (loading) {
     return (
       <div style={{ textAlign: 'center', padding: '3rem', color: '#94a3b8' }}>
@@ -73,7 +74,13 @@ export function CategoryTable({ categories, loading, onEdit, onDelete }: Categor
                 </span>
               </td>
               <td style={{ padding: '1rem', fontWeight: 600, color: '#0f172a' }}>
-                {category.name}
+                <button
+                  type="button"
+                  onClick={() => onView?.(category)}
+                  style={{ background: 'none', border: 'none', color: '#2563eb', cursor: 'pointer', padding: 0, fontWeight: 700 }}
+                >
+                  {category.name}
+                </button>
               </td>
               <td style={{ padding: '1rem' }}>
                 <span style={{ fontSize: '0.875rem', color: '#64748b' }}>
@@ -103,28 +110,42 @@ export function CategoryTable({ categories, loading, onEdit, onDelete }: Categor
                     onClick={() => onEdit?.(category)}
                     style={{
                       padding: '0.5rem',
-                      background: '#f8fafc',
-                      border: '1px solid #e2e8f0',
-                      borderRadius: '0.5rem',
+                      background: '#fff',
+                      border: '1.5px solid #e2e8f0',
+                      borderRadius: '0.75rem',
                       cursor: 'pointer',
                       color: '#64748b',
+                      transition: 'all 0.2s',
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.borderColor = '#6366f1';
+                      e.currentTarget.style.color = '#6366f1';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.borderColor = '#e2e8f0';
+                      e.currentTarget.style.color = '#64748b';
                     }}
                   >
                     <Edit2 size={16} />
                   </button>
                   <button
-                    onClick={() => {
-                      if (confirm('Xác nhận xóa danh mục này?')) {
-                        onDelete?.(category.id);
-                      }
-                    }}
+                    onClick={() => onDelete?.(category.id)}
                     style={{
                       padding: '0.5rem',
-                      background: '#fef2f2',
-                      border: '1px solid #fecaca',
-                      borderRadius: '0.5rem',
+                      background: '#fff',
+                      border: '1.5px solid #fee2e2',
+                      borderRadius: '0.75rem',
                       cursor: 'pointer',
-                      color: '#dc2626',
+                      color: '#ef4444',
+                      transition: 'all 0.2s',
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.background = '#fef2f2';
+                      e.currentTarget.style.borderColor = '#ef4444';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.background = '#fff';
+                      e.currentTarget.style.borderColor = '#fee2e2';
                     }}
                   >
                     <Trash2 size={16} />

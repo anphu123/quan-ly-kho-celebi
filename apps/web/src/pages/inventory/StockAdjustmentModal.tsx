@@ -72,7 +72,7 @@ export default function StockAdjustmentModal({
             </div>
             <div>
               <h2 className="text-2xl font-[1000] text-slate-900 tracking-tight leading-none">Hiệu chuẩn Tồn kho</h2>
-              <p className="text-[10px] font-black text-indigo-500 uppercase tracking-[0.2em] mt-3 italic">Manual Inventory Recalibration</p>
+              <p className="text-[10px] font-black text-indigo-500 uppercase tracking-[0.2em] mt-3 italic">Hiệu chuẩn thủ công</p>
             </div>
           </div>
           <button onClick={handleClose} className="w-14 h-14 bg-slate-50 border border-slate-100 rounded-full flex items-center justify-center text-slate-400 hover:text-rose-500 hover:bg-rose-50 transition-all group">
@@ -92,7 +92,7 @@ export default function StockAdjustmentModal({
                 <Package className="w-8 h-8 text-slate-400" />
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 italic">Target Asset SKU</p>
+                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 italic">SKU mục tiêu</p>
                 <h3 className="text-xl font-[1000] text-slate-900 tracking-tight leading-none mb-2 truncate">{stockItem.productTemplate?.name || stockItem.product?.name}</h3>
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="px-3 py-1 bg-slate-900 text-indigo-400 rounded-xl font-mono text-[11px] font-black tracking-widest uppercase">{stockItem.productTemplate?.sku || stockItem.product?.sku}</span>
@@ -104,12 +104,12 @@ export default function StockAdjustmentModal({
             <div className="grid grid-cols-2 gap-4">
               <div className="p-5 bg-white border border-slate-100 rounded-2xl">
                 <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 flex items-center gap-2">
-                  <Warehouse className="w-3.5 h-3.5" /> Node Terminal
+                  <Warehouse className="w-3.5 h-3.5" /> Điểm kho
                 </p>
                 <p className="text-xs font-black text-slate-900 italic">{stockItem.warehouse.name} ({stockItem.warehouse.code})</p>
               </div>
               <div className="p-5 bg-white border border-slate-100 rounded-2xl">
-                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Current Balance</p>
+                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Tồn hiện tại</p>
                 <p className="text-xl font-[1000] text-indigo-600 tracking-tighter leading-none">1 <span className="text-[10px] font-black text-slate-300 uppercase italic ml-1">Cái</span></p>
               </div>
             </div>
@@ -122,7 +122,7 @@ export default function StockAdjustmentModal({
                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Cân đối số lượng mới *</label>
                 {newQuantity && (
                   <div className={`text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-widest flex items-center gap-1.5 ${quantityDiff >= 0 ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'}`}>
-                    <Zap className="w-3 h-3" /> Delta: {quantityDiff >= 0 ? '+' : ''}{quantityDiff.toLocaleString()}
+                    <Zap className="w-3 h-3" /> Chênh lệch: {quantityDiff >= 0 ? '+' : ''}{quantityDiff.toLocaleString()}
                   </div>
                 )}
               </div>
@@ -140,24 +140,24 @@ export default function StockAdjustmentModal({
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
               <div className="space-y-4">
-                <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">Reason Protocol *</label>
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">Lý do *</label>
                 <select
                   value={reason}
                   onChange={(e) => setReason(e.target.value)}
                   className="w-full px-6 py-5 bg-slate-50 border border-slate-200 rounded-[1.5rem] font-bold text-sm text-slate-900 focus:bg-white transition-all outline-none appearance-none"
                   required
                 >
-                  <option value="">-- Select Protocol --</option>
-                  <option value="Kiểm kê định kỳ">Kiểm kê định kỳ (Audit)</option>
-                  <option value="Hàng hỏng">Hàng hỏng (Damaged)</option>
-                  <option value="Hàng thất lạc">Hàng thất lạc (Lost)</option>
-                  <option value="Điều chỉnh nhầm lẫn">Điều chỉnh nhầm (Admin Error)</option>
-                  <option value="Khuyến mại">Khuyến mại (Promotion)</option>
-                  <option value="Khác">Giao thức khác (Other)</option>
+                  <option value="">-- Chọn lý do --</option>
+                  <option value="Kiểm kê định kỳ">Kiểm kê định kỳ</option>
+                  <option value="Hàng hỏng">Hàng hỏng</option>
+                  <option value="Hàng thất lạc">Hàng thất lạc</option>
+                  <option value="Điều chỉnh nhầm lẫn">Điều chỉnh nhầm</option>
+                  <option value="Khuyến mại">Khuyến mại</option>
+                  <option value="Khác">Khác</option>
                 </select>
               </div>
               <div className="space-y-4">
-                <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">Authority Notes</label>
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">Ghi chú xác thực</label>
                 <div className="relative group/input">
                   <FileText className="absolute left-6 top-6 w-5 h-5 text-slate-300 group-focus-within/input:text-indigo-500 transition-colors" />
                   <textarea
@@ -165,7 +165,7 @@ export default function StockAdjustmentModal({
                     onChange={(e) => setNotes(e.target.value)}
                     className="w-full pl-16 pr-6 py-5 bg-slate-50 border border-slate-200 rounded-[1.5rem] font-bold text-sm text-slate-900 focus:bg-white transition-all outline-none resize-none shadow-inner"
                     rows={1}
-                    placeholder="Internal comments..."
+                    placeholder="Ghi chú nội bộ..."
                   />
                 </div>
               </div>
@@ -178,8 +178,8 @@ export default function StockAdjustmentModal({
                 <ShieldAlert className="w-7 h-7" />
               </div>
               <div>
-                <p className="text-lg font-black text-rose-900">Database Overload</p>
-                <p className="text-[11px] font-bold text-rose-600 uppercase tracking-widest mt-0.5">Lỗi ghi số lẻ hoặc mất kết nối Terminal.</p>
+                <p className="text-lg font-black text-rose-900">Quá tải hệ thống</p>
+                <p className="text-[11px] font-bold text-rose-600 uppercase tracking-widest mt-0.5">Lỗi ghi số lẻ hoặc mất kết nối điểm kho.</p>
               </div>
             </div>
           )}
@@ -193,7 +193,7 @@ export default function StockAdjustmentModal({
             disabled={adjustStockMutation.isPending}
             className="px-10 py-5 text-sm font-black text-slate-400 uppercase tracking-[0.25em] hover:text-slate-900 transition-colors"
           >
-            Abort
+            Hủy
           </button>
           <button
             onClick={handleSubmit}

@@ -1,14 +1,17 @@
-import { LucideIcon } from 'lucide-react';
+import type { ComponentType } from 'react';
+import type { LucideProps } from 'lucide-react';
+
+type IconType = ComponentType<LucideProps>;
 
 interface PageHeaderProps {
-  icon?: LucideIcon;
+  icon?: IconType;
   tag?: string;
   title: string;
   subtitle?: string;
   description?: string;
   action?: {
     label: string;
-    icon?: LucideIcon;
+    icon?: IconType;
     onClick: () => void;
   };
 }

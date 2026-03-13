@@ -1,12 +1,14 @@
-import { FolderTree, Package, Layers } from 'lucide-react';
+import { FolderTree, Package, Layers, Info } from 'lucide-react';
 import { StatsCard } from '../../../components/widgets/StatsCard';
 
 interface CategoryStatsProps {
   stats: {
     total: number;
     electronics: number;
-    accessories: number;
-    services: number;
+    applianceLarge: number;
+    applianceSmall: number;
+    computer: number;
+    accessory: number;
   };
 }
 
@@ -31,10 +33,28 @@ export function CategoryStats({ stats }: CategoryStatsProps) {
         color="purple"
       />
       <StatsCard
-        label="Phụ kiện"
-        value={stats.accessories}
+        label="Điện máy lớn"
+        value={stats.applianceLarge}
         icon={Layers}
+        color="orange"
+      />
+      <StatsCard
+        label="Điện máy nhỏ"
+        value={stats.applianceSmall}
+        icon={Info}
+        color="emerald"
+      />
+      <StatsCard
+        label="Máy tính"
+        value={stats.computer}
+        icon={Package}
         color="blue"
+      />
+      <StatsCard
+        label="Phụ kiện"
+        value={stats.accessory}
+        icon={Layers}
+        color="indigo"
       />
     </div>
   );

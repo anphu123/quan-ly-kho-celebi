@@ -5,9 +5,10 @@ interface BrandCardProps {
   brand: Brand;
   onEdit?: (brand: Brand) => void;
   onDelete?: (id: string) => void;
+  onView?: (brand: Brand) => void;
 }
 
-export function BrandCard({ brand, onEdit, onDelete }: BrandCardProps) {
+export function BrandCard({ brand, onEdit, onDelete, onView }: BrandCardProps) {
   return (
     <div style={{
       background: '#fff',
@@ -25,6 +26,7 @@ export function BrandCard({ brand, onEdit, onDelete }: BrandCardProps) {
       e.currentTarget.style.transform = 'translateY(0)';
       e.currentTarget.style.boxShadow = 'none';
     }}
+    onClick={() => onView?.(brand)}
     >
       {/* Logo */}
       <div style={{

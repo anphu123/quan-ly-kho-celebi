@@ -19,23 +19,34 @@ export class StockService {
     productTemplateId: string,
     warehouseId: string,
     grade: Grade | null,
+    tx?: any, // Thêm transaction client
   ) {
-    let stockLevel = await this.prisma.stockLevel.findUnique({
-      where: {
-        productTemplateId_warehouseId_grade: {
+    const client = tx || this.prisma;
+    const normalizedGrade = grade ?? null;
+    let stockLevel = normalizedGrade === null
+      ? await client.stockLevel.findFirst({
+        where: {
           productTemplateId,
           warehouseId,
-          grade: grade || null,
+          grade: null,
         },
-      },
-    });
+      })
+      : await client.stockLevel.findUnique({
+        where: {
+          productTemplateId_warehouseId_grade: {
+            productTemplateId,
+            warehouseId,
+            grade: normalizedGrade,
+          },
+        },
+      });
 
     if (!stockLevel) {
-      stockLevel = await this.prisma.stockLevel.create({
+      stockLevel = await client.stockLevel.create({
         data: {
           productTemplateId,
           warehouseId,
-          grade: grade || null,
+          grade: normalizedGrade,
           physicalQty: 0,
           incomingQty: 0,
           qcInProgressQty: 0,
@@ -63,8 +74,10 @@ export class StockService {
     userId: string,
     referenceType?: string,
     referenceId?: string,
+    tx?: any, // Thêm transaction client
   ) {
-    const serialItem = await this.prisma.serialItem.findUnique({
+    const client = tx || this.prisma;
+    const serialItem = await client.serialItem.findUnique({
       where: { id: serialItemId },
       include: { 
         productTemplate: true,
@@ -82,12 +95,13 @@ export class StockService {
 
     const { productTemplateId, warehouseId, grade } = serialItem;
 
-    return this.prisma.$transaction(async (tx) => {
+    const performUpdate = async (txClient: any) => {
       // Get or create stock level
       const stockLevel = await this.getOrCreateStockLevel(
         productTemplateId,
         warehouseId,
         grade,
+        txClient,
       );
 
       // Calculate changes
@@ -120,7 +134,7 @@ export class StockService {
       }
 
       // Update stock level
-      const updatedStockLevel = await tx.stockLevel.update({
+      const updatedStockLevel = await txClient.stockLevel.update({
         where: { id: stockLevel.id },
         data: changes,
       });
@@ -133,7 +147,7 @@ export class StockService {
           ? `${inboundRequest.supplierType} - ${inboundRequest.supplierName}`
           : serialItem.source || 'Unknown source';
 
-        await tx.stockMovement.create({
+        await txClient.stockMovement.create({
           data: {
             productTemplateId,
             warehouseId,
@@ -152,7 +166,7 @@ export class StockService {
         });
       } else if (isOldInStock && !isNewInStock) {
         // OUT movement
-        await tx.stockMovement.create({
+        await txClient.stockMovement.create({
           data: {
             productTemplateId,
             warehouseId,
@@ -176,7 +190,16 @@ export class StockService {
       );
 
       return updatedStockLevel;
-    });
+    };
+
+    // Nếu đã có transaction (tx), dùng luôn. Nếu không, tạo mới $transaction.
+    if (tx) {
+      return performUpdate(tx);
+    } else {
+      return this.prisma.$transaction(async (newTx) => {
+        return performUpdate(newTx);
+      });
+    }
   }
 
   /**
@@ -187,11 +210,12 @@ export class StockService {
     warehouseId: string,
     grade: Grade | null,
   ) {
+    const normalizedGrade = grade ?? null;
     const serialItems = await this.prisma.serialItem.findMany({
       where: {
         productTemplateId,
         warehouseId,
-        grade: grade || null,
+        grade: normalizedGrade,
       },
     });
 
@@ -222,23 +246,36 @@ export class StockService {
 
     const averageCost = counts.physicalQty > 0 ? totalCost / counts.physicalQty : 0;
 
-    return this.prisma.stockLevel.upsert({
-      where: {
-        productTemplateId_warehouseId_grade: {
-          productTemplateId,
-          warehouseId,
-          grade: grade || null,
+    const existing = normalizedGrade === null
+      ? await this.prisma.stockLevel.findFirst({
+        where: { productTemplateId, warehouseId, grade: null },
+      })
+      : await this.prisma.stockLevel.findUnique({
+        where: {
+          productTemplateId_warehouseId_grade: {
+            productTemplateId,
+            warehouseId,
+            grade: normalizedGrade,
+          },
         },
-      },
-      create: {
+      });
+
+    if (existing) {
+      return this.prisma.stockLevel.update({
+        where: { id: existing.id },
+        data: {
+          ...counts,
+          averageCost,
+          totalValue: totalCost,
+        },
+      });
+    }
+
+    return this.prisma.stockLevel.create({
+      data: {
         productTemplateId,
         warehouseId,
-        grade: grade || null,
-        ...counts,
-        averageCost,
-        totalValue: totalCost,
-      },
-      update: {
+        grade: normalizedGrade,
         ...counts,
         averageCost,
         totalValue: totalCost,

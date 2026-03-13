@@ -115,12 +115,12 @@ export default function StockMovementsModal({
             <div className="space-y-1">
               <h2 className="text-2xl font-[1000] text-slate-900 tracking-tight leading-none">Nhật ký Biến động</h2>
               <div className="flex items-center gap-3">
-                <p className="text-[10px] font-black text-indigo-500 uppercase tracking-[0.2em] italic">Movement Intelligence Ledger</p>
+                <p className="text-[10px] font-black text-indigo-500 uppercase tracking-[0.2em] italic">Sổ thông minh biến động</p>
                 <div className="w-1 h-1 rounded-full bg-slate-200" />
                 {meta && (
                   <div className="flex items-center gap-1.5 px-3 py-1 bg-slate-950 text-white rounded-full font-black text-[9px] uppercase tracking-widest">
                     <Database className="w-3 h-3" />
-                    {meta.total} Records Found
+                    Tìm thấy {meta.total} dòng
                   </div>
                 )}
               </div>
@@ -147,7 +147,7 @@ export default function StockMovementsModal({
                 <div className="absolute inset-0 border-4 border-indigo-100 rounded-full" />
                 <div className="absolute inset-0 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin" />
               </div>
-              <p className="text-[10px] font-[1000] text-slate-400 uppercase tracking-[0.3em] animate-pulse">Syncing Transactional Data...</p>
+              <p className="text-[10px] font-[1000] text-slate-400 uppercase tracking-[0.3em] animate-pulse">Đang đồng bộ dữ liệu giao dịch...</p>
             </div>
           ) : movements.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-32 space-y-8 animate-fade-in opacity-50">
@@ -155,7 +155,7 @@ export default function StockMovementsModal({
                 <FileText className="w-16 h-16 text-slate-300" />
               </div>
               <div className="text-center space-y-2">
-                <p className="text-2xl font-[1000] text-slate-900 tracking-tight">Zero Movements Tracked</p>
+                <p className="text-2xl font-[1000] text-slate-900 tracking-tight">Chưa có biến động</p>
                 <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Giao dịch xuất nhập kho sẽ hiển thị sau khi khởi tạo lệnh đầu tiên.</p>
               </div>
             </div>
@@ -197,7 +197,7 @@ export default function StockMovementsModal({
 
                         <div className="flex flex-col sm:flex-row sm:items-end gap-3 sm:gap-6">
                           <div className="min-w-0">
-                            <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1 italic">Asset Identity</p>
+                            <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1 italic">Nhận diện tài sản</p>
                             <h3 className="text-xl font-[1000] text-slate-900 tracking-tight leading-none group-hover:text-indigo-600 transition-colors truncate">{movement.product.name}</h3>
                           </div>
                           <div className="shrink-0 flex items-center gap-2 px-3 py-1 bg-slate-50 border border-slate-100 rounded-xl">
@@ -213,7 +213,7 @@ export default function StockMovementsModal({
                               <div className="flex-1 px-5 py-3 bg-slate-50 border border-slate-100 rounded-2xl flex items-center gap-3">
                                 <Database className="w-4 h-4 text-indigo-400 opacity-50" />
                                 <p className="text-xs font-bold text-slate-600 tracking-tight leading-none">
-                                  <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest mr-2 opacity-60">Protocol:</span>
+                                  <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest mr-2 opacity-60">Lý do:</span>
                                   {movement.reason}
                                 </p>
                               </div>
@@ -222,7 +222,7 @@ export default function StockMovementsModal({
                               <div className="flex-1 px-5 py-3 bg-emerald-50/30 border border-emerald-100 rounded-2xl flex items-center gap-3">
                                 <FileText className="w-4 h-4 text-emerald-500 opacity-50" />
                                 <p className="text-xs font-bold text-emerald-700 tracking-tight leading-none truncate">
-                                  <span className="text-[9px] font-black text-emerald-400 uppercase tracking-widest mr-2 opacity-60">Auth Notes:</span>
+                                  <span className="text-[9px] font-black text-emerald-400 uppercase tracking-widest mr-2 opacity-60">Ghi chú xác thực:</span>
                                   {movement.notes}
                                 </p>
                               </div>
@@ -269,7 +269,7 @@ export default function StockMovementsModal({
           <div className="relative sticky bottom-0 bg-white/70 backdrop-blur-3xl border-t border-slate-100 px-10 py-10 flex flex-col sm:flex-row items-center justify-between gap-6 z-10 shrink-0">
             <div className="text-[10px] font-black text-slate-400 uppercase tracking-[0.25em] flex items-center gap-3">
               <Database className="w-4 h-4 opacity-50" />
-              Showing Ledger Index {((page - 1) * limit) + 1} — {Math.min(page * limit, meta.total)} of {meta.total}
+              Hiển thị {((page - 1) * limit) + 1} — {Math.min(page * limit, meta.total)} trên {meta.total}
             </div>
 
             <div className="flex items-center gap-3">

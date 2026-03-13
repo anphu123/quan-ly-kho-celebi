@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   Plus, Package, Search, Edit, Trash2, X, Loader2, Filter,
@@ -7,6 +8,7 @@ import {
 import { productTemplatesApi, categoriesApi, brandsApi, unitsApi } from '../../api/masterdata.api';
 
 export default function ProductsPage() {
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [searchTerm, setSearchTerm] = useState('');
   const [page, setPage] = useState(1);
@@ -103,10 +105,7 @@ export default function ProductsPage() {
                 className="table-filter-btn"
                 style={{ padding: '0.35rem 0.7rem', fontSize: 12 }}
                 onClick={() => {
-                  alert('Vui lòng tạo danh mục từ trang Quản lý Danh mục');
-                  // const name = window.prompt('Nhập tên danh mục mới:');
-                  // if (!name || !name.trim()) return;
-                  // createCategoryMutation.mutate(name.trim());
+                  navigate('/categories');
                 }}
               >
                 <Plus size={12} /> Thêm danh mục
@@ -137,10 +136,7 @@ export default function ProductsPage() {
                 className="table-filter-btn"
                 style={{ padding: '0.35rem 0.7rem', fontSize: 12 }}
                 onClick={() => {
-                  alert('Vui lòng tạo thương hiệu từ trang Quản lý Thương hiệu');
-                  // const name = window.prompt('Nhập tên thương hiệu mới:');
-                  // if (!name || !name.trim()) return;
-                  // createBrandMutation.mutate(name.trim());
+                  navigate('/brands');
                 }}
               >
                 <Plus size={12} /> Thêm brand
@@ -314,11 +310,11 @@ function ProductModal({ product, categories, brands, units, onClose, onSuccess }
   const queryClient = useQueryClient();
 
   const [formData, setFormData] = useState<any>({
-    sku: product?.sku || '', 
-    name: product?.name || '', 
+    sku: product?.sku || '',
+    name: product?.name || '',
     description: product?.description || '',
-    categoryId: product?.categoryId || '', 
-    brandId: product?.brandId || '', 
+    categoryId: product?.categoryId || '',
+    brandId: product?.brandId || '',
     baseUnitId: product?.baseUnitId || '',
     baseWholesalePrice: product ? Number(product.baseWholesalePrice || 0) : 0,
     baseRetailPrice: product ? Number(product.baseRetailPrice || 0) : 0,
@@ -330,8 +326,8 @@ function ProductModal({ product, categories, brands, units, onClose, onSuccess }
   });
 
   const createCategoryMutation = useMutation({
-    mutationFn: (name: string) => categoriesApi.create({ 
-      name, 
+    mutationFn: (name: string) => categoriesApi.create({
+      name,
       code: name.toUpperCase().replace(/\s+/g, '_'),
       productType: 'ELECTRONICS'
     }),
@@ -342,8 +338,8 @@ function ProductModal({ product, categories, brands, units, onClose, onSuccess }
   });
 
   const createBrandMutation = useMutation({
-    mutationFn: (name: string) => brandsApi.create({ 
-      name, 
+    mutationFn: (name: string) => brandsApi.create({
+      name,
       code: name.toUpperCase().replace(/\s+/g, '_')
     }),
     onSuccess: (created) => {

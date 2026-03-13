@@ -22,9 +22,9 @@ const CONDITION_LEVELS = [
 ];
 
 const SUPPLIER_TYPES = [
-  { val: 'INDIVIDUAL_SELLER', label: '🏪 Bán lẻ (Individual)' },
-  { val: 'CUSTOMER_TRADE_IN', label: '🔄 Trade-in (Thu cũ)' },
-  { val: 'LIQUIDATION', label: '📦 Thanh lý (Bulk)' },
+  { val: 'INDIVIDUAL_SELLER', label: '🏪 Bán lẻ' },
+  { val: 'CUSTOMER_TRADE_IN', label: '🔄 Thu cũ' },
+  { val: 'LIQUIDATION', label: '📦 Thanh lý' },
   { val: 'INTERNAL_RETURN', label: '↩️ Trả nội bộ' },
 ];
 
@@ -182,7 +182,7 @@ export default function CreateInboundPage() {
                 </div>
 
                 <div className="form-field">
-                  <label className="form-label">Thời gian dự kiến (ETA)</label>
+                  <label className="form-label">Thời gian dự kiến</label>
                   <div style={{ position: 'relative' }}>
                     <Calendar size={16} style={{ position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8', pointerEvents: 'none' }} />
                     <input
@@ -442,7 +442,7 @@ export default function CreateInboundPage() {
                 </div>
                 <div>
                   <p style={{ fontWeight: 900, color: '#818cf8', fontSize: '1rem', letterSpacing: '-0.02em' }}>Tóm tắt phiếu</p>
-                  <p style={{ fontSize: '0.5625rem', fontWeight: 900, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.15em' }}>Inbound Summary</p>
+                  <p style={{ fontSize: '0.5625rem', fontWeight: 900, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.15em' }}>Tóm tắt nhập kho</p>
                 </div>
               </div>
 

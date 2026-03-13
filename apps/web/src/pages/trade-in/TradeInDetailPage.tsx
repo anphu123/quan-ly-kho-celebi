@@ -5,9 +5,13 @@ import {
     ArrowLeft, Smartphone, User, CreditCard,
     Image as ImageIcon, CheckCircle2, Clock,
     ClipboardCheck, Activity, DollarSign, X, ZoomIn,
-    Building2, FileText, Printer, Edit2, Save, XCircle
+    Building2, FileText, Printer, Edit2, Save, XCircle, Loader2, Upload
 } from 'lucide-react';
 import { inboundApi } from '../../api/inbound.api';
+import { uploadApi } from '../../api/upload.api';
+import { ProductLabel } from '../../components/inventory/ProductLabel';
+import { resolveImageUrl } from '../../lib/image';
+
 
 // Format currency
 const fmt = (n?: number) => n != null ? n.toLocaleString('vi-VN') + ' đ' : '—';
@@ -34,8 +38,14 @@ export default function TradeInDetailPage() {
     const navigate = useNavigate();
     const queryClient = useQueryClient();
     const [imageModal, setImageModal] = useState<{ url: string; title: string } | null>(null);
+    const [showAllImages, setShowAllImages] = useState(false);
     const [isEditing, setIsEditing] = useState(false);
     const [editForm, setEditForm] = useState<any>({});
+    const [showLabel, setShowLabel] = useState(false);
+    const [isUploadingDeviceImages, setIsUploadingDeviceImages] = useState(false);
+    const [isUploadingCccdFront, setIsUploadingCccdFront] = useState(false);
+    const [isUploadingCccdBack, setIsUploadingCccdBack] = useState(false);
+
 
     const { data: request, isLoading, isError, error } = useQuery({
         queryKey: ['trade-in-item', id],
@@ -44,69 +54,6 @@ export default function TradeInDetailPage() {
     });
 
     console.log('TradeInDetailPage:', { id, isLoading, isError, error, request, items: request?.items });
-
-    if (isLoading) {
-        return <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '100vh', color: '#64748b', fontSize: 16 }}>
-            <div style={{ textAlign: 'center' }}>
-                <div style={{ marginBottom: 12 }}>⏳</div>
-                <div>Đang tải dữ liệu đơn...</div>
-            </div>
-        </div>;
-    }
-
-    if (isError || !request || !request.items || request.items.length === 0) {
-        return <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '100vh', color: '#ef4444', fontSize: 16 }}>
-            <div style={{ textAlign: 'center', maxWidth: 500, padding: 20 }}>
-                <div style={{ marginBottom: 12, fontSize: 32 }}>❌</div>
-                <div style={{ fontWeight: 700, marginBottom: 8 }}>Lỗi khi tải dữ liệu đơn</div>
-                <div style={{ fontSize: 14, color: '#94a3b8', marginBottom: 16 }}>
-                    {error ? (error as any)?.response?.data?.message || (error as any)?.message || 'Không thể tải dữ liệu' : 'Không tìm thấy dữ liệu'}
-                </div>
-                <button 
-                    onClick={() => navigate('/trade-in-xiaomi')}
-                    style={{ padding: '8px 16px', background: '#6366f1', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer' }}
-                >
-                    Quay lại danh sách
-                </button>
-            </div>
-        </div>;
-    }
-
-    // Now safe to destructure - request is guaranteed to exist here
-    // Request-level fields
-    const { code, status, warehouse, createdAt, receivedBy, updatedAt } = request!;
-
-    // Item-level fields (trade-in requests typically have 1 item)
-    const item = request!.items[0];
-    const {
-        modelName, serialNumber,
-        notes, contractNumber, purchaseDate, employeeName,
-        sourceCustomerName, sourceCustomerPhone, sourceCustomerAddress,
-        sourceCustomerIdCard, idCardIssueDate, idCardIssuePlace,
-        bankAccount, bankName,
-        estimatedValue, otherCosts, topUp, repairCost,
-        imageUrl, deviceImages, cccdFrontUrl, cccdBackUrl,
-        receivedAt,
-        serialItem,
-    } = item as any;
-
-    const currentStatus = statusConfig[status as keyof typeof statusConfig] || statusConfig['REQUESTED'];
-    const totalCost = (Number(estimatedValue) || 0) + (Number(otherCosts) || 0) + (Number(topUp) || 0);
-
-    let parsedDeviceImages: string[] = [];
-    if (Array.isArray(deviceImages)) {
-        parsedDeviceImages = deviceImages as unknown as string[];
-    } else if (typeof deviceImages === 'string' && deviceImages.trim() !== '') {
-        try {
-            const parsed = JSON.parse(deviceImages);
-            if (Array.isArray(parsed)) {
-                parsedDeviceImages = parsed;
-            }
-        } catch (e) {
-            console.error('Invalid deviceImages JSON in TradeInDetailPage', { deviceImages, error: e });
-            parsedDeviceImages = [];
-        }
-    }
 
     const receiveMutation = useMutation({
         mutationFn: () => inboundApi.receiveItems(id!),
@@ -149,11 +96,91 @@ export default function TradeInDetailPage() {
         }
     });
 
+    if (isLoading) {
+        return <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '100vh', color: '#64748b', fontSize: 16 }}>
+            <div style={{ textAlign: 'center' }}>
+                <div style={{ marginBottom: 12 }}>⏳</div>
+                <div>Đang tải dữ liệu đơn...</div>
+            </div>
+        </div>;
+    }
+
+    if (isError || !request || !request.items || request.items.length === 0) {
+        return <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '100vh', color: '#ef4444', fontSize: 16 }}>
+            <div style={{ textAlign: 'center', maxWidth: 500, padding: 20 }}>
+                <div style={{ marginBottom: 12, fontSize: 32 }}>❌</div>
+                <div style={{ fontWeight: 700, marginBottom: 8 }}>Lỗi khi tải dữ liệu đơn</div>
+                <div style={{ fontSize: 14, color: '#94a3b8', marginBottom: 16 }}>
+                    {error ? (error as any)?.response?.data?.message || (error as any)?.message || 'Không thể tải dữ liệu' : 'Không tìm thấy dữ liệu'}
+                </div>
+                <button
+                    onClick={() => navigate('/trade-in-xiaomi')}
+                    style={{ padding: '8px 16px', background: '#6366f1', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer' }}
+                >
+                    Quay lại danh sách
+                </button>
+            </div>
+        </div>;
+    }
+
+    // Now safe to destructure - request is guaranteed to exist here
+    // Request-level fields
+    const { code, status, warehouse, createdAt, receivedBy, updatedAt } = request!;
+
+    // Item-level fields (trade-in requests typically have 1 item)
+    const item = request!.items[0];
+    const {
+        modelName, serialNumber,
+        notes, contractNumber, purchaseDate, employeeName,
+        sourceCustomerName, sourceCustomerPhone, sourceCustomerAddress,
+        sourceCustomerIdCard, idCardIssueDate, idCardIssuePlace,
+        bankAccount, bankName,
+        estimatedValue, otherCosts, topUp, repairCost,
+        imageUrl, deviceImages, cccdFrontUrl, cccdBackUrl,
+        receivedAt,
+        serialItem,
+    } = item as any;
+
+    const currentImageUrl = isEditing ? editForm.imageUrl : imageUrl;
+    const currentDeviceImages = isEditing ? editForm.deviceImages : deviceImages;
+    const currentCccdFrontUrl = isEditing ? editForm.cccdFrontUrl : cccdFrontUrl;
+    const currentCccdBackUrl = isEditing ? editForm.cccdBackUrl : cccdBackUrl;
+
+    const currentStatus = statusConfig[status as keyof typeof statusConfig] || statusConfig['REQUESTED'];
+    const totalCost = (Number(estimatedValue) || 0) + (Number(otherCosts) || 0) + (Number(topUp) || 0);
+
+    let parsedDeviceImages: string[] = [];
+    if (Array.isArray(currentDeviceImages)) {
+        parsedDeviceImages = currentDeviceImages as unknown as string[];
+    } else if (typeof currentDeviceImages === 'string' && currentDeviceImages.trim() !== '') {
+        try {
+            const parsed = JSON.parse(currentDeviceImages);
+            if (Array.isArray(parsed)) {
+                parsedDeviceImages = parsed;
+            }
+        } catch (e) {
+            console.error('Invalid deviceImages JSON in TradeInDetailPage', { deviceImages, error: e });
+            parsedDeviceImages = [];
+        }
+    }
+
+    const list = [currentImageUrl, ...parsedDeviceImages].filter(Boolean) as string[];
+    const unique = new Set<string>();
+    list.forEach((u) => unique.add(u));
+    const allDeviceImages = Array.from(unique);
+
+    const visibleDeviceImages = showAllImages ? allDeviceImages : allDeviceImages.slice(0, 6);
+    const remainingCount = Math.max(0, allDeviceImages.length - visibleDeviceImages.length);
+
     const handleEdit = () => {
         setEditForm({
             modelName: item.modelName,
             serialNumber: item.serialNumber,
             notes: item.notes,
+            imageUrl: item.imageUrl,
+            deviceImages: item.deviceImages,
+            cccdFrontUrl: item.cccdFrontUrl,
+            cccdBackUrl: item.cccdBackUrl,
             sourceCustomerName: item.sourceCustomerName,
             sourceCustomerPhone: item.sourceCustomerPhone,
             sourceCustomerAddress: item.sourceCustomerAddress,
@@ -171,6 +198,56 @@ export default function TradeInDetailPage() {
             repairCost: item.repairCost || 0,
         });
         setIsEditing(true);
+    };
+
+    const handleUploadDeviceImages = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const files = Array.from(e.target.files || []);
+        if (files.length === 0) return;
+        setIsUploadingDeviceImages(true);
+        try {
+            const urls = await uploadApi.uploadImages(files);
+            const merged = Array.from(new Set([...(parsedDeviceImages || []), ...urls]));
+            setEditForm((p: any) => ({
+                ...p,
+                imageUrl: merged[0],
+                deviceImages: JSON.stringify(merged),
+            }));
+        } catch (err: any) {
+            alert(err?.message || 'Lỗi tải lên ảnh thiết bị');
+        } finally {
+            setIsUploadingDeviceImages(false);
+            e.target.value = '';
+        }
+    };
+
+    const handleUploadCccdFront = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        setIsUploadingCccdFront(true);
+        try {
+            const url = await uploadApi.uploadImage(file);
+            setEditForm((p: any) => ({ ...p, cccdFrontUrl: url }));
+        } catch (err: any) {
+            alert(err?.message || 'Lỗi tải lên CCCD mặt trước');
+        } finally {
+            setIsUploadingCccdFront(false);
+            e.target.value = '';
+        }
+    };
+
+    const handleUploadCccdBack = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        setIsUploadingCccdBack(true);
+        try {
+            const url = await uploadApi.uploadImage(file);
+            setEditForm((p: any) => ({ ...p, cccdBackUrl: url }));
+        } catch (err: any) {
+            alert(err?.message || 'Lỗi tải lên CCCD mặt sau');
+        } finally {
+            setIsUploadingCccdBack(false);
+            e.target.value = '';
+        }
     };
 
     const handleSave = () => {
@@ -233,12 +310,14 @@ export default function TradeInDetailPage() {
         );
     };
 
-    const ImgPreview = ({ url, label }: { url: string, label: string }) => (
+    const ImgPreview = ({ url, label }: { url: string, label: string }) => {
+        const resolvedUrl = resolveImageUrl(url);
+        return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             <span style={{ fontSize: 12, fontWeight: 600, color: '#64748b' }}>{label}</span>
             {url ? (
                 <div
-                    onClick={() => setImageModal({ url, title: label })}
+                    onClick={() => setImageModal({ url: resolvedUrl, title: label })}
                     style={{
                         display: 'block', borderRadius: 12, overflow: 'hidden',
                         border: '1px solid #e2e8f0', height: 160, width: '100%',
@@ -254,7 +333,13 @@ export default function TradeInDetailPage() {
                         e.currentTarget.style.boxShadow = 'none';
                     }}
                 >
-                    <img src={url} alt={label} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    <img
+                        src={resolvedUrl}
+                        alt={label}
+                        loading="lazy"
+                        decoding="async"
+                        style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                    />
                     <div style={{
                         position: 'absolute', top: 8, right: 8,
                         background: 'rgba(0,0,0,0.6)', borderRadius: 8,
@@ -271,14 +356,82 @@ export default function TradeInDetailPage() {
             )}
         </div>
     );
+    };
 
     const handlePrint = () => {
         window.print();
     };
 
+    const handlePrintLabel = () => {
+        setShowLabel(true);
+        setTimeout(() => {
+            window.print();
+            setShowLabel(false);
+        }, 500);
+    };
+
+    // Helper to parse RAM/ROM from title (fallback)
+    const parseRamRom = (title: string) => {
+        const ramMatch = title.match(/(\d+)\s*GB\s*RAM/i) || title.match(/RAM\s*(\d+)\s*GB/i);
+        const romMatch = title.match(/(\d+)\s*GB(?!\s*RAM)/i) || title.match(/(\d+)\s*TB/i);
+
+        return {
+            ram: ramMatch ? ramMatch[0] : '',
+            rom: romMatch ? romMatch[0] : ''
+        };
+    };
+
+    const specs = parseRamRom(modelName || '');
+
+    const getMissingFieldsForCompletion = () => {
+        const src = isEditing ? editForm : item;
+        const missing: string[] = [];
+
+        const requiredTextFields: Array<{ key: string; label: string }> = [
+            { key: 'modelName', label: 'Thiết bị' },
+            { key: 'serialNumber', label: 'IMEI / Serial (sản phẩm)' },
+            { key: 'notes', label: 'Ghi chú tình trạng' },
+            { key: 'sourceCustomerName', label: 'Tên khách hàng' },
+            { key: 'sourceCustomerPhone', label: 'Số điện thoại' },
+            { key: 'sourceCustomerAddress', label: 'Địa chỉ' },
+            { key: 'sourceCustomerIdCard', label: 'Số CCCD' },
+            { key: 'idCardIssueDate', label: 'Ngày cấp CCCD' },
+            { key: 'idCardIssuePlace', label: 'Nơi cấp CCCD' },
+            { key: 'bankAccount', label: 'Số tài khoản' },
+            { key: 'bankName', label: 'Ngân hàng' },
+            { key: 'contractNumber', label: 'Số hợp đồng' },
+            { key: 'purchaseDate', label: 'Ngày mua' },
+            { key: 'employeeName', label: 'Nhân viên' },
+        ];
+
+        const requiredNumberFields: Array<{ key: string; label: string }> = [
+            { key: 'estimatedValue', label: 'Giá thu mua' },
+            { key: 'otherCosts', label: 'Chi phí khác' },
+            { key: 'topUp', label: 'Top Up' },
+            { key: 'repairCost', label: 'Giá sửa chữa khuyên dùng' },
+        ];
+
+        requiredTextFields.forEach(({ key, label }) => {
+            const val = (src as any)?.[key];
+            if (val == null || String(val).trim() === '') missing.push(label);
+        });
+
+        requiredNumberFields.forEach(({ key, label }) => {
+            const val = (src as any)?.[key];
+            if (val == null || Number.isNaN(Number(val))) missing.push(label);
+        });
+
+        const hasDeviceImages = (currentImageUrl && String(currentImageUrl).trim() !== '') || (parsedDeviceImages?.length || 0) > 0;
+        if (!hasDeviceImages) missing.push('Ảnh thiết bị');
+        if (!currentCccdFrontUrl) missing.push('CCCD mặt trước');
+        if (!currentCccdBackUrl) missing.push('CCCD mặt sau');
+
+        return missing;
+    };
+
     return (
         <>
-            <div style={{ padding: '24px 32px', maxWidth: 1400, margin: '0 auto', background: '#f8fafc', minHeight: '100vh' }}>
+            <div style={{ padding: 'clamp(12px, 4vw, 32px)', maxWidth: 1400, margin: '0 auto', background: '#f8fafc', minHeight: '100vh' }}>
                 {/* Header */}
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24, flexWrap: 'wrap', gap: 16 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 16, flex: 1, minWidth: 300 }}>
@@ -412,6 +565,30 @@ export default function TradeInDetailPage() {
                         >
                             <Printer size={18} />
                             In phiếu
+                        </button>
+
+                        {/* Label Print Button */}
+                        <button
+                            onClick={handlePrintLabel}
+                            className="no-print"
+                            style={{
+                                padding: '10px 20px', background: '#6366f1', color: '#fff',
+                                borderRadius: 10, fontWeight: 600, border: 'none',
+                                cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8,
+                                transition: 'all 0.2s',
+                                boxShadow: '0 4px 12px rgba(99, 102, 241, 0.2)'
+                            }}
+                            onMouseEnter={(e) => {
+                                e.currentTarget.style.transform = 'translateY(-1px)';
+                                e.currentTarget.style.boxShadow = '0 6px 16px rgba(99, 102, 241, 0.3)';
+                            }}
+                            onMouseLeave={(e) => {
+                                e.currentTarget.style.transform = 'translateY(0)';
+                                e.currentTarget.style.boxShadow = '0 4px 12px rgba(99, 102, 241, 0.2)';
+                            }}
+                        >
+                            <Printer size={18} />
+                            In Tem A7
                         </button>
                     </div>
                 </div>
@@ -575,7 +752,14 @@ export default function TradeInDetailPage() {
                     )}
                     {status === 'IN_PROGRESS' && (
                         <button
-                            onClick={() => { if (confirm('Hoàn tất kiểm tra và nhập kho thiết bị này?')) completeMutation.mutate(undefined) }}
+                            onClick={() => {
+                                const missing = getMissingFieldsForCompletion();
+                                if (missing.length > 0) {
+                                    alert(`Vui lòng hoàn thiện tất cả trường thông tin trước khi nhập kho:\n- ${missing.join('\n- ')}`);
+                                    return;
+                                }
+                                if (confirm('Hoàn tất kiểm tra và nhập kho thiết bị này?')) completeMutation.mutate(undefined);
+                            }}
                             disabled={completeMutation.isPending}
                             style={{
                                 padding: '12px 24px',
@@ -626,7 +810,7 @@ export default function TradeInDetailPage() {
                     )}
 
                     {/* Row 1: Thông tin thiết bị & Định giá */}
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))', gap: 24 }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 350px), 1fr))', gap: 24 }}>
                         <Card title="Thông tin thiết bị" icon={<Smartphone size={18} />}>
                             <EditableInfoRow label="Thiết bị" fieldName="modelName" value={modelName} />
                             {/* IMEI sản phẩm (người dùng nhập) */}
@@ -674,7 +858,7 @@ export default function TradeInDetailPage() {
                     </Card>
 
                     {/* Row 3: Thanh toán & Hợp đồng */}
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))', gap: 24 }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 350px), 1fr))', gap: 24 }}>
                         <Card title="Thông tin thanh toán" icon={<CreditCard size={18} />}>
                             <EditableInfoRow label="Ngân hàng" fieldName="bankName" value={bankName} />
                             <EditableInfoRow label="Số Tài Khoản" fieldName="bankAccount" value={bankAccount} highlight />
@@ -701,13 +885,87 @@ export default function TradeInDetailPage() {
 
                     {/* Row 5: Hình ảnh */}
                     <Card title="Hình ảnh thiết bị & CCCD" icon={<ImageIcon size={18} />}>
-                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 16 }}>
-                            <ImgPreview url={imageUrl || parsedDeviceImages[0]} label="Ảnh chính thiết bị" />
-                            {parsedDeviceImages.slice(1, 4).map((url: string, idx: number) => (
-                                <ImgPreview key={idx} url={url} label={`Ảnh thiết bị ${idx + 2}`} />
-                            ))}
-                            <ImgPreview url={cccdFrontUrl || ''} label="CCCD mặt trước" />
-                            <ImgPreview url={cccdBackUrl || ''} label="CCCD mặt sau" />
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: 16 }}>
+                            {isEditing && (
+                                <div style={{ gridColumn: '1 / -1', display: 'flex', flexWrap: 'wrap', gap: 12, alignItems: 'center', marginBottom: 8 }}>
+                                    <label style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '6px 12px', borderRadius: 8, border: '1.5px solid #c7d2fe', background: '#eef2ff', color: '#4338ca', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>
+                                        <input type="file" multiple accept="image/*" style={{ display: 'none' }} onChange={handleUploadDeviceImages} />
+                                        {isUploadingDeviceImages ? <Loader2 size={14} className="animate-spin" /> : <Upload size={14} />}
+                                        {isUploadingDeviceImages ? 'Đang tải ảnh...' : 'Tải ảnh thiết bị'}
+                                    </label>
+                                    <label style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '6px 12px', borderRadius: 8, border: '1.5px solid #c7d2fe', background: '#eef2ff', color: '#4338ca', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>
+                                        <input type="file" accept="image/*" style={{ display: 'none' }} onChange={handleUploadCccdFront} />
+                                        {isUploadingCccdFront ? <Loader2 size={14} className="animate-spin" /> : <Upload size={14} />}
+                                        {isUploadingCccdFront ? 'Đang tải CCCD trước...' : 'Tải CCCD mặt trước'}
+                                    </label>
+                                    <label style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '6px 12px', borderRadius: 8, border: '1.5px solid #c7d2fe', background: '#eef2ff', color: '#4338ca', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>
+                                        <input type="file" accept="image/*" style={{ display: 'none' }} onChange={handleUploadCccdBack} />
+                                        {isUploadingCccdBack ? <Loader2 size={14} className="animate-spin" /> : <Upload size={14} />}
+                                        {isUploadingCccdBack ? 'Đang tải CCCD sau...' : 'Tải CCCD mặt sau'}
+                                    </label>
+                                </div>
+                            )}
+                            <div style={{ gridColumn: '1 / -1', fontSize: 12, fontWeight: 700, color: '#64748b' }}>
+                                Ảnh thiết bị ({allDeviceImages.length})
+                            </div>
+
+                            {visibleDeviceImages.length === 0 ? (
+                                <div style={{ gridColumn: '1 / -1', height: 140, borderRadius: 12, border: '1px dashed #cbd5e1', background: '#f8fafc', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#94a3b8', flexDirection: 'column', gap: 8 }}>
+                                    <ImageIcon size={28} strokeWidth={1.5} />
+                                    <span style={{ fontSize: 12 }}>Chưa có ảnh thiết bị</span>
+                                </div>
+                            ) : (
+                                <>
+                                    {visibleDeviceImages.map((url, idx) => (
+                                        <div
+                                            key={`${url}-${idx}`}
+                                            onClick={() => setImageModal({ url: resolveImageUrl(url), title: `Ảnh thiết bị ${idx + 1}` })}
+                                            style={{
+                                                borderRadius: 12,
+                                                overflow: 'hidden',
+                                                border: '1px solid #e2e8f0',
+                                                height: 140,
+                                                background: '#f8fafc',
+                                                cursor: 'pointer',
+                                                position: 'relative'
+                                            }}
+                                        >
+                                            <img src={resolveImageUrl(url)} alt="" loading="lazy" decoding="async" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                            <div style={{
+                                                position: 'absolute', top: 6, right: 6,
+                                                background: 'rgba(0,0,0,0.6)', borderRadius: 6,
+                                                padding: 4, color: '#fff', fontSize: 11, fontWeight: 700
+                                            }}>
+                                                {idx + 1}
+                                            </div>
+                                        </div>
+                                    ))}
+                                    {!showAllImages && remainingCount > 0 && (
+                                        <button
+                                            type="button"
+                                            onClick={() => setShowAllImages(true)}
+                                            style={{
+                                                borderRadius: 12,
+                                                border: '1.5px dashed #cbd5e1',
+                                                background: '#f8fafc',
+                                                height: 140,
+                                                cursor: 'pointer',
+                                                fontWeight: 800,
+                                                fontSize: 14,
+                                                color: '#64748b'
+                                            }}
+                                        >
+                                            +{remainingCount} ảnh
+                                        </button>
+                                    )}
+                                </>
+                            )}
+
+                            <div style={{ gridColumn: '1 / -1', marginTop: 8, fontSize: 12, fontWeight: 700, color: '#64748b' }}>
+                                CCCD
+                            </div>
+                            <ImgPreview url={currentCccdFrontUrl || ''} label="CCCD mặt trước" />
+                            <ImgPreview url={currentCccdBackUrl || ''} label="CCCD mặt sau" />
                         </div>
                     </Card>
 
@@ -739,7 +997,7 @@ export default function TradeInDetailPage() {
                     </button>
                     <div style={{ maxWidth: '90%', maxHeight: '90%', textAlign: 'center' }}>
                         <img
-                            src={imageModal.url}
+                            src={resolveImageUrl(imageModal.url)}
                             alt={imageModal.title}
                             style={{ maxWidth: '100%', maxHeight: '85vh', objectFit: 'contain', borderRadius: 8 }}
                             onClick={(e) => e.stopPropagation()}
@@ -759,6 +1017,11 @@ export default function TradeInDetailPage() {
                     }
                     body {
                         background: white !important;
+                        margin: 0;
+                        padding: 0;
+                    }
+                    .print-label-only .no-print-label {
+                        display: none !important;
                     }
                 }
                 
@@ -771,6 +1034,39 @@ export default function TradeInDetailPage() {
                     }
                 }
             `}</style>
+
+            {/* Hidden Print Container for Labels */}
+            {showLabel && (
+                <div className="label-print-overlay">
+                    <ProductLabel
+                        name={modelName}
+                        ram={specs.ram}
+                        rom={specs.rom}
+                        imei={serialNumber || serialItem?.internalCode || 'N/A'}
+                        price={fmt(totalCost)}
+                        barcodeType="1D"
+                    />
+                    <style>{`
+                        .label-print-overlay {
+                            position: fixed;
+                            top: 0;
+                            left: 0;
+                            width: 100vw;
+                            height: 100vh;
+                            background: white;
+                            z-index: 99999;
+                            display: flex;
+                            align-items: center;
+                            justify-content: center;
+                        }
+                        @media screen {
+                            .label-print-overlay {
+                                display: none;
+                            }
+                        }
+                    `}</style>
+                </div>
+            )}
         </>
     );
 }

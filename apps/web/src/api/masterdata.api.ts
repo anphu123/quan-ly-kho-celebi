@@ -8,12 +8,19 @@ export interface Category {
   id: string;
   name: string;
   code: string;
-  productType: 'ELECTRONICS' | 'ACCESSORIES' | 'SERVICES';
-  trackingMethod: 'SERIAL_BASED' | 'BATCH_BASED' | 'NON_TRACKED';
+  productType: 'ELECTRONICS' | 'APPLIANCE_LARGE' | 'APPLIANCE_SMALL' | 'COMPUTER' | 'ACCESSORY';
+  trackingMethod: 'SERIAL_BASED' | 'QUANTITY_BASED';
   description?: string;
   parentId?: string;
   parent?: Category;
   children?: Category[];
+  brandCategories?: Array<{
+    id: string;
+    brandId: string;
+    categoryId: string;
+    brand?: Brand;
+  }>;
+  productTemplates?: ProductTemplate[];
   _count?: {
     productTemplates: number;
   };
@@ -26,6 +33,13 @@ export interface Brand {
   name: string;
   code: string;
   logo?: string;
+  brandCategories?: Array<{
+    id: string;
+    brandId: string;
+    categoryId: string;
+    category?: Category;
+  }>;
+  productTemplates?: ProductTemplate[];
   _count?: {
     productTemplates: number;
   };
@@ -57,16 +71,18 @@ export interface ProductTemplate {
 export interface CreateCategoryDto {
   name: string;
   code: string;
-  productType: 'ELECTRONICS' | 'ACCESSORIES' | 'SERVICES';
-  trackingMethod?: 'SERIAL_BASED' | 'BATCH_BASED' | 'NON_TRACKED';
+  productType: 'ELECTRONICS' | 'APPLIANCE_LARGE' | 'APPLIANCE_SMALL' | 'COMPUTER' | 'ACCESSORY';
+  trackingMethod?: 'SERIAL_BASED' | 'QUANTITY_BASED';
   description?: string;
   parentId?: string;
+  brandIds?: string[];
 }
 
 export interface CreateBrandDto {
   name: string;
   code: string;
   logo?: string;
+  categoryIds?: string[];
 }
 
 export interface CreateProductTemplateDto {
@@ -84,12 +100,14 @@ export interface CreateProductTemplateDto {
 
 export interface CategoryQuery {
   search?: string;
-  productType?: 'ELECTRONICS' | 'ACCESSORIES' | 'SERVICES';
-  trackingMethod?: 'SERIAL_BASED' | 'BATCH_BASED' | 'NON_TRACKED';
+  productType?: 'ELECTRONICS' | 'APPLIANCE_LARGE' | 'APPLIANCE_SMALL' | 'COMPUTER' | 'ACCESSORY';
+  trackingMethod?: 'SERIAL_BASED' | 'QUANTITY_BASED';
+  brandId?: string;
 }
 
 export interface BrandQuery {
   search?: string;
+  categoryId?: string;
 }
 
 export interface ProductTemplateQuery {
@@ -120,6 +138,7 @@ export const categoriesApi = {
     if (query?.search) params.append('search', query.search);
     if (query?.productType) params.append('productType', query.productType);
     if (query?.trackingMethod) params.append('trackingMethod', query.trackingMethod);
+    if (query?.brandId) params.append('brandId', query.brandId);
 
     const response = await api.get(`/categories?${params.toString()}`);
     return response.data;
@@ -147,8 +166,10 @@ export const categoriesApi = {
   getProductTypeLabel(type: string): string {
     const labels = {
       ELECTRONICS: '📱 Điện tử',
-      ACCESSORIES: '🎧 Phụ kiện',
-      SERVICES: '🛠️ Dịch vụ',
+      APPLIANCE_LARGE: '📺 Điện máy lớn',
+      APPLIANCE_SMALL: '🍳 Điện máy nhỏ',
+      COMPUTER: '💻 Máy tính',
+      ACCESSORY: '🎧 Phụ kiện',
     };
     return labels[type as keyof typeof labels] || type;
   },
@@ -156,8 +177,7 @@ export const categoriesApi = {
   getTrackingMethodLabel(method: string): string {
     const labels = {
       SERIAL_BASED: '🔢 Theo Serial',
-      BATCH_BASED: '📦 Theo Lô',
-      NON_TRACKED: '❌ Không theo dõi',
+      QUANTITY_BASED: '📦 Theo số lượng',
     };
     return labels[method as keyof typeof labels] || method;
   },
@@ -171,6 +191,7 @@ export const brandsApi = {
   async getAll(query?: BrandQuery): Promise<Brand[]> {
     const params = new URLSearchParams();
     if (query?.search) params.append('search', query.search);
+    if (query?.categoryId) params.append('categoryId', query.categoryId);
 
     const response = await api.get(`/brands?${params.toString()}`);
     return response.data;

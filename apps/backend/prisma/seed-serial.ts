@@ -116,6 +116,126 @@ async function main() {
     data: { name: 'LG', code: 'LG' },
   })
 
+  const xiaomi = await prisma.brand.create({
+    data: { name: 'Xiaomi', code: 'XIAOMI' },
+  })
+
+  const oppo = await prisma.brand.create({
+    data: { name: 'OPPO', code: 'OPPO' },
+  })
+
+  const vivo = await prisma.brand.create({
+    data: { name: 'Vivo', code: 'VIVO' },
+  })
+
+  const realme = await prisma.brand.create({
+    data: { name: 'realme', code: 'REALME' },
+  })
+
+  const huawei = await prisma.brand.create({
+    data: { name: 'Huawei', code: 'HUAWEI' },
+  })
+
+  const nokia = await prisma.brand.create({
+    data: { name: 'Nokia', code: 'NOKIA' },
+  })
+
+  const sony = await prisma.brand.create({
+    data: { name: 'Sony', code: 'SONY' },
+  })
+
+  const asus = await prisma.brand.create({
+    data: { name: 'ASUS', code: 'ASUS' },
+  })
+
+  const google = await prisma.brand.create({
+    data: { name: 'Google', code: 'GOOGLE' },
+  })
+
+  const oneplus = await prisma.brand.create({
+    data: { name: 'OnePlus', code: 'ONEPLUS' },
+  })
+
+  const dell = await prisma.brand.create({
+    data: { name: 'Dell', code: 'DELL' },
+  })
+
+  const hp = await prisma.brand.create({
+    data: { name: 'HP', code: 'HP' },
+  })
+
+  const lenovo = await prisma.brand.create({
+    data: { name: 'Lenovo', code: 'LENOVO' },
+  })
+
+  const acer = await prisma.brand.create({
+    data: { name: 'Acer', code: 'ACER' },
+  })
+
+  const msi = await prisma.brand.create({
+    data: { name: 'MSI', code: 'MSI' },
+  })
+
+  const tcl = await prisma.brand.create({
+    data: { name: 'TCL', code: 'TCL' },
+  })
+
+  const hisense = await prisma.brand.create({
+    data: { name: 'Hisense', code: 'HISENSE' },
+  })
+
+  const panasonic = await prisma.brand.create({
+    data: { name: 'Panasonic', code: 'PANASONIC' },
+  })
+
+  // Bind Brands to Smartphone Category
+  await prisma.brandCategory.createMany({
+    data: [
+      { brandId: apple.id, categoryId: smartphoneCategory.id },
+      { brandId: samsung.id, categoryId: smartphoneCategory.id },
+      { brandId: lg.id, categoryId: smartphoneCategory.id },
+      { brandId: xiaomi.id, categoryId: smartphoneCategory.id },
+      { brandId: oppo.id, categoryId: smartphoneCategory.id },
+      { brandId: vivo.id, categoryId: smartphoneCategory.id },
+      { brandId: realme.id, categoryId: smartphoneCategory.id },
+      { brandId: huawei.id, categoryId: smartphoneCategory.id },
+      { brandId: nokia.id, categoryId: smartphoneCategory.id },
+      { brandId: sony.id, categoryId: smartphoneCategory.id },
+      { brandId: asus.id, categoryId: smartphoneCategory.id },
+      { brandId: google.id, categoryId: smartphoneCategory.id },
+      { brandId: oneplus.id, categoryId: smartphoneCategory.id },
+    ],
+  })
+
+  // Bind Brands to Laptop Category
+  await prisma.brandCategory.createMany({
+    data: [
+      { brandId: apple.id, categoryId: laptopCategory.id },
+      { brandId: dell.id, categoryId: laptopCategory.id },
+      { brandId: hp.id, categoryId: laptopCategory.id },
+      { brandId: lenovo.id, categoryId: laptopCategory.id },
+      { brandId: asus.id, categoryId: laptopCategory.id },
+      { brandId: acer.id, categoryId: laptopCategory.id },
+      { brandId: msi.id, categoryId: laptopCategory.id },
+      { brandId: samsung.id, categoryId: laptopCategory.id },
+      { brandId: lg.id, categoryId: laptopCategory.id },
+      { brandId: huawei.id, categoryId: laptopCategory.id },
+    ],
+  })
+
+  // Bind Brands to TV Category
+  await prisma.brandCategory.createMany({
+    data: [
+      { brandId: samsung.id, categoryId: applianceCategory.id },
+      { brandId: lg.id, categoryId: applianceCategory.id },
+      { brandId: sony.id, categoryId: applianceCategory.id },
+      { brandId: tcl.id, categoryId: applianceCategory.id },
+      { brandId: hisense.id, categoryId: applianceCategory.id },
+      { brandId: panasonic.id, categoryId: applianceCategory.id },
+      { brandId: xiaomi.id, categoryId: applianceCategory.id },
+    ],
+  })
+
   // Create Attribute Groups for Smartphones
   const hardwareGroup = await prisma.attributeGroup.create({
     data: {

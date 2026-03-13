@@ -8,6 +8,7 @@ import { QCInspectionModule } from './modules/qc-inspection/qc-inspection.module
 import { InboundModule } from './modules/inbound/inbound.module';
 import { MasterdataModule } from './modules/masterdata/masterdata.module';
 import { StockModule } from './modules/stock/stock.module';
+import { UploadModule } from './modules/upload/upload.module';
 
 @Module({
   imports: [
@@ -35,6 +36,7 @@ import { StockModule } from './modules/stock/stock.module';
     InboundModule, // ⭐ Receiving & inbound operations
     MasterdataModule, // ⭐ Core Master Data (Categories, Brands, Products)
     StockModule, // ⭐ Stock Level & Movement Tracking
+    UploadModule, // ⭐ File uploads
   ],
 })
 export class AppModule { }

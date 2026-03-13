@@ -19,6 +19,7 @@ const WarehouseDetailPage = lazy(() => import('./pages/warehouses/WarehouseDetai
 const InboundPage = lazy(() => import('./pages/inbound/InboundPage'));
 const CreateInboundPage = lazy(() => import('./pages/inbound/CreateInboundPage'));
 const InboundDetailPage = lazy(() => import('./pages/inbound/InboundDetailPage'));
+const LabelPrinterPage = lazy(() => import('./pages/inventory/LabelPrinterPage'));
 const POSPage = lazy(() => import('./pages/pos/POSPage'));
 const OutboundPage = lazy(() => import('./pages/outbound/OutboundPage'));
 const CreateOutboundPage = lazy(() => import('./pages/outbound/CreateOutboundPage'));
@@ -30,7 +31,10 @@ const TradeInDetailPage = lazy(() => import('./pages/trade-in/TradeInDetailPage'
 const StockLevelsPage = lazy(() => import('./pages/stock/StockLevelsPage'));
 const CategoriesPage = lazy(() => import('./features/categories/CategoriesPage'));
 const BrandsPage = lazy(() => import('./features/brands/BrandsPage'));
+const CategoryDetailPage = lazy(() => import('./features/categories/CategoryDetailPage'));
+const BrandDetailPage = lazy(() => import('./features/brands/BrandDetailPage'));
 const ProductTemplatesPage = lazy(() => import('./pages/products/ProductTemplatesPage'));
+
 
 // --- Route Guards ---
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -70,7 +74,7 @@ function App() {
           {/* Index & Dashboard */}
           <Route index element={<Navigate to="/dashboard" replace />} />
           <Route path="dashboard" element={<DashboardPage />} />
-          
+
           {/* Core Modules */}
           <Route path="products" element={<ProductsPage />} />
           <Route path="inventory" element={<InventoryPage />} />
@@ -85,11 +89,15 @@ function App() {
             <Route path=":id" element={<WarehouseDetailPage />} />
           </Route>
 
+          <Route path="inventory/print-label" element={<LabelPrinterPage />} />
+
           <Route path="stock/levels" element={<StockLevelsPage />} />
 
           {/* Master Data Management */}
           <Route path="categories" element={<CategoriesPage />} />
+          <Route path="categories/:id" element={<CategoryDetailPage />} />
           <Route path="brands" element={<BrandsPage />} />
+          <Route path="brands/:id" element={<BrandDetailPage />} />
           <Route path="product-templates" element={<ProductTemplatesPage />} />
 
           {/* Inbound Ops */}
@@ -110,18 +118,18 @@ function App() {
             <Route index element={<TradeInXiaomiPage />} />
             <Route path="create" element={<CreateTradeInPage />} />
             <Route path="create-single" element={<CreateSingleTradeInPage />} />
-            <Route path=":id" element={<TradeInDetailPage />} />
-            {/* <Route path="/trade-in-xiaomi/:id" element={<TradeInDetailPage />} /> */}
+            {/* <Route path=":id" element={<TradeInDetailPage />} /> */}
+            <Route path="/trade-in-xiaomi/:id" element={<TradeInDetailPage />} />
           </Route>
 
           {/* Admin Restricted */}
-          <Route 
-            path="admin-ops" 
+          <Route
+            path="admin-ops"
             element={
               <SuperAdminRoute>
                 <AdminOpsPage />
               </SuperAdminRoute>
-            } 
+            }
           />
         </Route>
 

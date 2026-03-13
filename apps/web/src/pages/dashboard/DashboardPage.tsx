@@ -6,27 +6,27 @@ import {
 } from 'lucide-react';
 
 const BARS = [
-  { h: 40, label: 'Phase 01', val: '60.0k' },
-  { h: 65, label: 'Phase 02', val: '97.5k' },
-  { h: 30, label: 'Phase 03', val: '45.0k' },
-  { h: 85, label: 'Phase 04', val: '127.5k' },
-  { h: 55, label: 'Phase 05', val: '82.5k' },
-  { h: 75, label: 'Phase 06', val: '112.5k' },
-  { h: 100, label: 'Phase 07', val: '150.0k' },
+  { h: 40, label: 'Giai đoạn 01', val: '60.0k' },
+  { h: 65, label: 'Giai đoạn 02', val: '97.5k' },
+  { h: 30, label: 'Giai đoạn 03', val: '45.0k' },
+  { h: 85, label: 'Giai đoạn 04', val: '127.5k' },
+  { h: 55, label: 'Giai đoạn 05', val: '82.5k' },
+  { h: 75, label: 'Giai đoạn 06', val: '112.5k' },
+  { h: 100, label: 'Giai đoạn 07', val: '150.0k' },
 ];
 
 const STATS = [
   { title: 'Doanh thu ròng', val: '24,500K', unit: 'VNĐ', change: '+12.5%', trend: 'up', icon: TrendingUp, color: 'emerald' },
-  { title: 'Lưu lượng đơn', val: '1,284', unit: 'BILL', change: '+8%', trend: 'up', icon: ShoppingCart, color: 'indigo' },
-  { title: 'Filling Rate', val: '92.4%', unit: 'AVG', change: '-2.1%', trend: 'down', icon: Package, color: 'purple' },
-  { title: 'Active CRM', val: '402', unit: 'USER', change: '+15%', trend: 'up', icon: Users, color: 'blue' },
+  { title: 'Lưu lượng đơn', val: '1,284', unit: 'ĐƠN', change: '+8%', trend: 'up', icon: ShoppingCart, color: 'indigo' },
+  { title: 'Tỷ lệ đáp ứng', val: '92.4%', unit: 'TB', change: '-2.1%', trend: 'down', icon: Package, color: 'purple' },
+  { title: 'CRM đang hoạt động', val: '402', unit: 'NGƯỜI DÙNG', change: '+15%', trend: 'up', icon: Users, color: 'blue' },
 ];
 
 const FEED = [
-  { user: 'Admin Hub', action: 'Duyệt lệnh Inbound #INB-743', time: '2m ago', color: 'indigo', icon: Box },
-  { user: 'POS Unit 01', action: 'Hoàn tất Bill #8942 - 1.2M ₫', time: '12m ago', color: 'emerald', icon: ShoppingCart },
-  { user: 'Security Bot', action: 'Low stock alert: MK-14 AirPods', time: '45m ago', color: 'rose', icon: Activity },
-  { user: 'Warehouse B', action: 'Chốt tồn kho ca 01 - Pass QA', time: '1h ago', color: 'blue', icon: Package },
+  { user: 'Trung tâm Admin', action: 'Duyệt lệnh Inbound #INB-743', time: '2p trước', color: 'indigo', icon: Box },
+  { user: 'POS Quầy 01', action: 'Hoàn tất Bill #8942 - 1.2M ₫', time: '12p trước', color: 'emerald', icon: ShoppingCart },
+  { user: 'Bot An ninh', action: 'Cảnh báo tồn thấp: MK-14 AirPods', time: '45p trước', color: 'rose', icon: Activity },
+  { user: 'Kho B', action: 'Chốt tồn kho ca 01 - Đạt QA', time: '1g trước', color: 'blue', icon: Package },
 ];
 
 export default function DashboardPage() {
@@ -48,13 +48,13 @@ export default function DashboardPage() {
               <span />
               <span />
             </div>
-            Celebi Engine Operational
+            Celebi đang vận hành
           </div>
           <h1>
             Dữ liệu <span>Hợp nhất</span>
           </h1>
           <p className="dash-hero-sub">
-            Hệ thống nạp dữ liệu Real-time. Chào mừng Admin — đây là báo cáo tổng quát về chuỗi cung ứng và hiệu suất kinh doanh.
+            Hệ thống nạp dữ liệu theo thời gian thực. Chào mừng quản trị — đây là báo cáo tổng quát về chuỗi cung ứng và hiệu suất kinh doanh.
           </p>
         </div>
 
@@ -72,7 +72,7 @@ export default function DashboardPage() {
           </div>
           <button className="dash-insight-btn">
             <Sparkles size={14} />
-            Insight Analytics
+            Phân tích chuyên sâu
           </button>
         </div>
       </div>
@@ -111,8 +111,8 @@ export default function DashboardPage() {
         <div className="dash-chart-card">
           <div className="dash-chart-header">
             <div>
-              <h2>Supply Chain Performance</h2>
-              <p>Weekly Operational Activity Index</p>
+              <h2>Hiệu suất chuỗi cung ứng</h2>
+              <p>Chỉ số hoạt động theo tuần</p>
             </div>
             <div className="dash-chart-btns">
               <button
@@ -133,7 +133,7 @@ export default function DashboardPage() {
           <div className="dash-chart-body">
             {BARS.map((b, i) => (
               <div key={i} className="dash-bar-col">
-                <div className="dash-bar-tooltip">{b.val} Trans.</div>
+                <div className="dash-bar-tooltip">{b.val} giao dịch</div>
                 <div
                   className="dash-bar"
                   style={{ height: `${b.h}%` }}
@@ -154,7 +154,7 @@ export default function DashboardPage() {
               </div>
               <div>
                 <p className="dash-feed-title">Phản hồi Giao dịch</p>
-                <p className="dash-feed-subtitle">Live Feed · All Terminals</p>
+                <p className="dash-feed-subtitle">Luồng trực tiếp · Tất cả quầy</p>
               </div>
             </div>
             <button className="dash-feed-grid-btn">

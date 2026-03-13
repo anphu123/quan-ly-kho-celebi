@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Plus, Edit2, Trash2, Award, Package } from 'lucide-react';
 import { brandsApi } from '../../api/masterdata.api';
+import { resolveImageUrl } from '../../lib/image';
 
 export default function BrandsPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -173,7 +174,7 @@ export default function BrandsPage() {
                 border: '1px solid #e2e8f0',
               }}>
                 {brand.logo ? (
-                  <img src={brand.logo} alt={brand.name} style={{ width: '100%', height: '100%', objectFit: 'contain', borderRadius: 12 }} />
+                  <img src={resolveImageUrl(brand.logo)} alt={brand.name} style={{ width: '100%', height: '100%', objectFit: 'contain', borderRadius: 12 }} />
                 ) : (
                   <Award size={32} color="#cbd5e1" />
                 )}

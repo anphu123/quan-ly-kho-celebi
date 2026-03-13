@@ -1,9 +1,12 @@
-import { useState } from 'react';
+import { useState, useMemo, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Plus, Edit2, Trash2, Package, Search } from 'lucide-react';
 import { productTemplatesApi, categoriesApi, brandsApi } from '../../api/masterdata.api';
+import { resolveImageUrl } from '../../lib/image';
 
 export default function ProductTemplatesPage() {
+  const navigate = useNavigate();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<any>(null);
   const [searchTerm, setSearchTerm] = useState('');
@@ -37,6 +40,26 @@ export default function ProductTemplatesPage() {
     queryKey: ['brands'],
     queryFn: () => brandsApi.getAll(),
   });
+
+  const { data: brandsByCategory = [] } = useQuery({
+    queryKey: ['brands-by-category', filterCategory],
+    queryFn: () => brandsApi.getAll({ categoryId: filterCategory }),
+    enabled: !!filterCategory,
+  });
+
+  const brandFilterOptions = useMemo(() => {
+    return filterCategory ? brandsByCategory : brands;
+  }, [filterCategory, brandsByCategory, brands]);
+
+  const { data: brandsByFormCategory = [] } = useQuery({
+    queryKey: ['brands-by-category-form', formData.categoryId],
+    queryFn: () => brandsApi.getAll({ categoryId: formData.categoryId }),
+    enabled: !!formData.categoryId,
+  });
+
+  const formBrandOptions = useMemo(() => {
+    return formData.categoryId ? brandsByFormCategory : brands;
+  }, [formData.categoryId, brandsByFormCategory, brands]);
 
   const products = productsData?.data || [];
 
@@ -82,6 +105,22 @@ export default function ProductTemplatesPage() {
       image: '',
     });
   };
+
+  useEffect(() => {
+    if (filterCategory && filterBrand) {
+      const exists = (brandsByCategory || []).some((b: any) => b.id === filterBrand);
+      if (!exists) setFilterBrand('');
+    }
+  }, [filterCategory, filterBrand, brandsByCategory]);
+
+  useEffect(() => {
+    if (formData.categoryId && formData.brandId) {
+      const exists = (brandsByFormCategory || []).some((b: any) => b.id === formData.brandId);
+      if (!exists) {
+        setFormData(prev => ({ ...prev, brandId: '' }));
+      }
+    }
+  }, [formData.categoryId, formData.brandId, brandsByFormCategory]);
 
   const openModal = (product?: any) => {
     if (product) {
@@ -200,7 +239,7 @@ export default function ProductTemplatesPage() {
             }}
           >
             <option value="">Tất cả thương hiệu</option>
-            {brands.map((brand: any) => (
+            {brandFilterOptions.map((brand: any) => (
               <option key={brand.id} value={brand.id}>{brand.name}</option>
             ))}
           </select>
@@ -251,7 +290,7 @@ export default function ProductTemplatesPage() {
                         border: '1px solid #e2e8f0',
                       }}>
                         {product.image ? (
-                          <img src={product.image} alt={product.name} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 8 }} />
+                          <img src={resolveImageUrl(product.image)} alt={product.name} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 8 }} />
                         ) : (
                           <Package size={20} color="#cbd5e1" />
                         )}
@@ -270,10 +309,26 @@ export default function ProductTemplatesPage() {
                     </code>
                   </td>
                   <td style={{ padding: '16px 24px', color: '#64748b' }}>
-                    {product.category?.name || '—'}
+                    {product.category?.name ? (
+                      <button
+                        type="button"
+                        onClick={() => navigate(`/categories/${product.categoryId}`)}
+                        style={{ background: 'none', border: 'none', color: '#2563eb', cursor: 'pointer', padding: 0, fontWeight: 600 }}
+                      >
+                        {product.category.name}
+                      </button>
+                    ) : '—'}
                   </td>
                   <td style={{ padding: '16px 24px', color: '#64748b' }}>
-                    {product.brand?.name || '—'}
+                    {product.brand?.name ? (
+                      <button
+                        type="button"
+                        onClick={() => navigate(`/brands/${product.brandId}`)}
+                        style={{ background: 'none', border: 'none', color: '#2563eb', cursor: 'pointer', padding: 0, fontWeight: 600 }}
+                      >
+                        {product.brand.name}
+                      </button>
+                    ) : '—'}
                   </td>
                   <td style={{ padding: '16px 24px', textAlign: 'right', fontWeight: 600, color: '#0f172a' }}>
                     {fmt(product.baseRetailPrice)}
@@ -456,7 +511,7 @@ export default function ProductTemplatesPage() {
                     }}
                   >
                     <option value="">Không có</option>
-                    {brands.map((brand: any) => (
+                    {formBrandOptions.map((brand: any) => (
                       <option key={brand.id} value={brand.id}>{brand.name}</option>
                     ))}
                   </select>
@@ -466,7 +521,7 @@ export default function ProductTemplatesPage() {
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 20 }}>
                 <div>
                   <label style={{ display: 'block', marginBottom: 8, fontSize: 14, fontWeight: 600, color: '#475569' }}>
-                    Giá thu mua chuẩn (Grade A)
+                    Giá thu mua chuẩn (Hạng A)
                   </label>
                   <input
                     type="number"
@@ -485,7 +540,7 @@ export default function ProductTemplatesPage() {
 
                 <div>
                   <label style={{ display: 'block', marginBottom: 8, fontSize: 14, fontWeight: 600, color: '#475569' }}>
-                    Giá bán chuẩn (Grade A)
+                    Giá bán chuẩn (Hạng A)
                   </label>
                   <input
                     type="number"

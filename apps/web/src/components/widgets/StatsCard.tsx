@@ -1,9 +1,12 @@
-import { LucideIcon } from 'lucide-react';
+import type { ComponentType } from 'react';
+import type { LucideProps } from 'lucide-react';
+
+type IconType = ComponentType<LucideProps>;
 
 interface StatsCardProps {
   label: string;
   value: number | string;
-  icon: LucideIcon;
+  icon: IconType;
   color?: 'indigo' | 'purple' | 'blue' | 'emerald' | 'orange' | 'red';
   trend?: {
     value: number;

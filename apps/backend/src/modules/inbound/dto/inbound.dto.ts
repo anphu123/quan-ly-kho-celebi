@@ -106,16 +106,19 @@ export class CreateInboundItemDto {
   @ApiPropertyOptional()
   @IsOptional()
   @IsNumber({ maxDecimalPlaces: 2 })
+  @Min(0)
   otherCosts?: number;
 
   @ApiPropertyOptional()
   @IsOptional()
   @IsNumber({ maxDecimalPlaces: 2 })
+  @Min(0)
   topUp?: number;
 
   @ApiPropertyOptional()
   @IsOptional()
   @IsNumber({ maxDecimalPlaces: 2 })
+  @Min(0)
   repairCost?: number;
 
   @ApiPropertyOptional({ description: 'Image URL of device (primary)' })
@@ -224,13 +227,13 @@ export class UpdateInboundRequestDto {
   @ApiPropertyOptional()
   @IsOptional()
   @IsNumber({ maxDecimalPlaces: 2 })
-  @IsPositive()
+  @Min(0)
   totalEstimatedValue?: number;
 
   @ApiPropertyOptional()
   @IsOptional()
   @IsNumber({ maxDecimalPlaces: 2 })
-  @IsPositive()
+  @Min(0)
   totalActualValue?: number;
 
   @ApiPropertyOptional()
@@ -267,7 +270,7 @@ export class UpdateInboundItemDto {
   @ApiPropertyOptional()
   @IsOptional()
   @IsNumber({ maxDecimalPlaces: 2 })
-  @IsPositive()
+  @Min(0)
   estimatedValue?: number;
 
   @ApiPropertyOptional()
@@ -338,16 +341,19 @@ export class UpdateInboundItemDto {
   @ApiPropertyOptional()
   @IsOptional()
   @IsNumber({ maxDecimalPlaces: 2 })
+  @Min(0)
   otherCosts?: number;
 
   @ApiPropertyOptional()
   @IsOptional()
   @IsNumber({ maxDecimalPlaces: 2 })
+  @Min(0)
   topUp?: number;
 
   @ApiPropertyOptional()
   @IsOptional()
   @IsNumber({ maxDecimalPlaces: 2 })
+  @Min(0)
   repairCost?: number;
 
   @ApiPropertyOptional({ description: 'Image URL of device (primary)' })
@@ -440,7 +446,7 @@ export class CompleteInboundDto {
   @ApiPropertyOptional({ description: 'Total actual value' })
   @IsOptional()
   @IsNumber({ maxDecimalPlaces: 2 })
-  @IsPositive()
+  @Min(0)
   totalActualValue?: number;
 
   @ApiPropertyOptional({ description: 'Completion notes' })
