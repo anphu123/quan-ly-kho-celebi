@@ -20,9 +20,10 @@ const getApiUrl = () => {
     return envUrl;
   }
 
-  // Fallback
+  // Fallback: use same protocol as current page to avoid mixed content
+  const protocol = window.location.protocol;
   const port = 6868;
-  const url = `http://${hostname}:${port}/api/v1`;
+  const url = `${protocol}//${hostname}:${port}/api/v1`;
   console.log('🌐 API URL (Fallback):', url);
   return url;
 };
