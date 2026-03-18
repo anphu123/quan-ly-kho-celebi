@@ -78,3 +78,22 @@ export const unitsApi = {
     return data;
   },
 };
+
+export interface ProductTemplate {
+  id: string;
+  sku: string;
+  name: string;
+  categoryId: string;
+  brandId?: string;
+  category?: { id: string; name: string };
+  brand?: { id: string; name: string };
+  baseRetailPrice?: number;
+  baseWholesalePrice?: number;
+}
+
+export const productTemplatesApi = {
+  search: async (params: { search?: string; categoryId?: string; brandId?: string; limit?: number }) => {
+    const { data } = await api.get<{ data: ProductTemplate[] }>('/product-templates', { params: { ...params, limit: params.limit ?? 10 } });
+    return data.data;
+  },
+};

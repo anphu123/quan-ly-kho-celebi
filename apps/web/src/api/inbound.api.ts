@@ -254,7 +254,11 @@ export const inboundApi = {
   // ===========================
 
   async updateItem(itemId: string, data: Partial<InboundItem>): Promise<InboundItem> {
-    const response = await api.put(`/inbound/items/${itemId}`, data);
+    // Strip empty strings so optional @IsDateString / @IsString validators aren't triggered
+    const payload = Object.fromEntries(
+      Object.entries(data).filter(([, v]) => v !== '' && v !== null && v !== undefined)
+    );
+    const response = await api.put(`/inbound/items/${itemId}`, payload);
     return response.data;
   },
 

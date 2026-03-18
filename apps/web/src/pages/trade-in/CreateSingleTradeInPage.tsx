@@ -8,7 +8,7 @@ import {
 } from 'lucide-react';
 import { warehousesApi } from '../../lib/api/warehouses.api';
 import { suppliersApi } from '../../lib/api/suppliers.api';
-import { categoriesApi, brandsApi } from '../../lib/api/masterdata.api';
+import { categoriesApi, brandsApi, productTemplatesApi, type ProductTemplate } from '../../lib/api/masterdata.api';
 import { attributesApi, type AttributeGroup } from '../../api/attributes.api';
 import { inboundApi } from '../../api/inbound.api';
 import { uploadApi } from '../../api/upload.api';
@@ -168,6 +168,10 @@ export default function CreateSingleTradeInPage() {
     const [customBrandName, setCustomBrandName] = useState('');
     const [customAttributes, setCustomAttributes] = useState<Record<string, any>>({});
     const [attributeOtherSelected, setAttributeOtherSelected] = useState<Record<string, boolean>>({});
+    const [selectedTemplateId, setSelectedTemplateId] = useState('');
+    const [templateSearch, setTemplateSearch] = useState('');
+    const [showSuggestions, setShowSuggestions] = useState(false);
+    const suggestRef = useRef<HTMLDivElement>(null);
 
     const { data: suppliersData } = useQuery({ queryKey: ['suppliers'], queryFn: () => suppliersApi.getAll({ limit: 100 }) });
     const suppliers = suppliersData?.data || [];
@@ -195,6 +199,38 @@ export default function CreateSingleTradeInPage() {
         enabled: !!item.categoryId,
     });
     const attributeGroups: AttributeGroup[] = attributeGroupsData || [];
+
+    // ── Product template autocomplete ──
+    const { data: templateSuggestions = [] } = useQuery({
+        queryKey: ['template-suggest', templateSearch, item.categoryId, selectedBrandId],
+        queryFn: () => productTemplatesApi.search({
+            search: templateSearch,
+            categoryId: item.categoryId || undefined,
+            brandId: (selectedBrandId && selectedBrandId !== 'OTHER') ? selectedBrandId : undefined,
+            limit: 8,
+        }),
+        enabled: templateSearch.length >= 1,
+        staleTime: 10_000,
+    });
+
+    // Close suggestions on outside click
+    useEffect(() => {
+        const handler = (e: MouseEvent) => {
+            if (suggestRef.current && !suggestRef.current.contains(e.target as Node)) {
+                setShowSuggestions(false);
+            }
+        };
+        document.addEventListener('mousedown', handler);
+        return () => document.removeEventListener('mousedown', handler);
+    }, []);
+
+    const selectTemplate = (tpl: ProductTemplate) => {
+        setItem(p => ({ ...p, modelName: tpl.name, categoryId: tpl.categoryId, productTemplateId: tpl.id }));
+        setTemplateSearch(tpl.name);
+        setSelectedTemplateId(tpl.id);
+        if (tpl.brandId) setSelectedBrandId(tpl.brandId);
+        setShowSuggestions(false);
+    };
 
     const brandOptions = useMemo(() => {
         return categoryBrandsData || [];
@@ -453,7 +489,59 @@ export default function CreateSingleTradeInPage() {
                             </Field>
                         )}
                         <Field label="Tên thiết bị *" icon={<Smartphone size={12} color="#f97316" />} col={2}>
-                            <input type="text" name="modelName" required style={inputStyle} value={item.modelName} onChange={onInput} placeholder="VD: Xiaomi 14 Pro 256GB" />
+                            <div ref={suggestRef} style={{ position: 'relative' }}>
+                                <input
+                                    type="text"
+                                    required
+                                    style={inputStyle}
+                                    value={templateSearch || item.modelName || ''}
+                                    onChange={e => {
+                                        const v = e.target.value;
+                                        setTemplateSearch(v);
+                                        setItem(p => ({ ...p, modelName: v, productTemplateId: undefined }));
+                                        setSelectedTemplateId('');
+                                        setShowSuggestions(true);
+                                    }}
+                                    onFocus={() => { if (templateSearch.length >= 1) setShowSuggestions(true); }}
+                                    placeholder="VD: iPhone 15 Pro Max 256GB — gõ để gợi ý"
+                                />
+                                {selectedTemplateId && (
+                                    <span style={{
+                                        position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)',
+                                        fontSize: 11, color: '#16a34a', fontWeight: 700, pointerEvents: 'none'
+                                    }}>✓ Đã chọn mẫu</span>
+                                )}
+                                {showSuggestions && templateSuggestions.length > 0 && (
+                                    <div style={{
+                                        position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 999,
+                                        background: '#fff', border: '1.5px solid #e2e8f0', borderRadius: 10,
+                                        boxShadow: '0 8px 24px rgba(0,0,0,0.10)', marginTop: 4, overflow: 'hidden',
+                                    }}>
+                                        {templateSuggestions.map((tpl: ProductTemplate) => (
+                                            <div
+                                                key={tpl.id}
+                                                onMouseDown={() => selectTemplate(tpl)}
+                                                style={{
+                                                    padding: '9px 14px', cursor: 'pointer', fontSize: 13,
+                                                    borderBottom: '1px solid #f1f5f9',
+                                                    display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                                                    transition: 'background 0.1s',
+                                                }}
+                                                onMouseEnter={e => (e.currentTarget.style.background = '#f8faff')}
+                                                onMouseLeave={e => (e.currentTarget.style.background = '#fff')}
+                                            >
+                                                <span style={{ color: '#0f172a', fontWeight: 500 }}>{tpl.name}</span>
+                                                <span style={{ fontSize: 11, color: '#94a3b8' }}>
+                                                    {tpl.brand?.name}{tpl.category ? ` · ${tpl.category.name}` : ''}
+                                                </span>
+                                            </div>
+                                        ))}
+                                        <div style={{ padding: '7px 14px', fontSize: 11, color: '#94a3b8', background: '#fafbff' }}>
+                                            Không thấy? Nhập tay tên thiết bị bên trên.
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
                         </Field>
                         {attributeGroups.length > 0 && (
                             <div style={{ gridColumn: '1 / -1', marginTop: 4 }}>

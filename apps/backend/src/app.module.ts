@@ -9,6 +9,8 @@ import { InboundModule } from './modules/inbound/inbound.module';
 import { MasterdataModule } from './modules/masterdata/masterdata.module';
 import { StockModule } from './modules/stock/stock.module';
 import { UploadModule } from './modules/upload/upload.module';
+import { AttributesModule } from './modules/attributes/attributes.module';
+import { OutboundModule } from './modules/outbound/outbound.module';
 
 @Module({
   imports: [
@@ -37,6 +39,8 @@ import { UploadModule } from './modules/upload/upload.module';
     MasterdataModule, // ⭐ Core Master Data (Categories, Brands, Products)
     StockModule, // ⭐ Stock Level & Movement Tracking
     UploadModule, // ⭐ File uploads
+    AttributesModule, // ⭐ EAV Attribute Groups & Attributes
+    OutboundModule,   // ⭐ Outbound / Sales operations
   ],
 })
 export class AppModule { }

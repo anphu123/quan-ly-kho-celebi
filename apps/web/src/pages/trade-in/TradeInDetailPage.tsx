@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
@@ -7,7 +7,7 @@ import {
     ClipboardCheck, Activity, DollarSign, X, ZoomIn,
     Building2, FileText, Printer, Edit2, Save, XCircle, Loader2, Upload
 } from 'lucide-react';
-import { inboundApi } from '../../api/inbound.api';
+import { inboundApi, type InboundItem } from '../../api/inbound.api';
 import { uploadApi } from '../../api/upload.api';
 import { ProductLabel } from '../../components/inventory/ProductLabel';
 import { resolveImageUrl } from '../../lib/image';
@@ -27,6 +27,79 @@ const fmtDateTime = (d?: string) => {
     return date.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }) + ' ' + date.toLocaleDateString('vi-VN');
 };
 
+// ─── Module-level components (tránh re-create mỗi lần render) ───────────────
+
+const Card = ({ title, icon, children }: { title: string; icon: React.ReactNode; children: React.ReactNode }) => (
+    <div style={{ background: '#fff', borderRadius: 16, border: '1px solid #f1f5f9', boxShadow: '0 4px 20px rgba(0,0,0,0.03)', overflow: 'hidden' }}>
+        <div style={{ padding: '16px 20px', borderBottom: '1px solid #f1f5f9', display: 'flex', alignItems: 'center', gap: 10, background: '#fafbff' }}>
+            <div style={{ color: '#6366f1' }}>{icon}</div>
+            <h3 style={{ margin: 0, fontSize: 14, fontWeight: 700, color: '#1e293b' }}>{title}</h3>
+        </div>
+        <div style={{ padding: 20 }}>
+            {children}
+        </div>
+    </div>
+);
+
+const InfoRow = ({ label, value, highlight = false }: { label: string; value: string | React.ReactNode; highlight?: boolean }) => (
+    <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px dashed #f1f5f9' }}>
+        <span style={{ color: '#64748b', fontSize: 13 }}>{label}</span>
+        <span style={{ color: highlight ? '#6366f1' : '#0f172a', fontSize: 13, fontWeight: highlight ? 700 : 500, textAlign: 'right', maxWidth: '60%' }}>
+            {value || '—'}
+        </span>
+    </div>
+);
+
+const ImgPreview = ({ url, label, onZoom }: { url: string; label: string; onZoom: (url: string, title: string) => void }) => {
+    const resolvedUrl = resolveImageUrl(url);
+    return (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <span style={{ fontSize: 12, fontWeight: 600, color: '#64748b' }}>{label}</span>
+            {url ? (
+                <div
+                    onClick={() => onZoom(resolvedUrl, label)}
+                    style={{
+                        display: 'block', borderRadius: 12, overflow: 'hidden',
+                        border: '1px solid #e2e8f0', height: 160, width: '100%',
+                        background: '#f8fafc', cursor: 'pointer', position: 'relative',
+                        transition: 'all 0.2s ease'
+                    }}
+                    onMouseEnter={(e) => {
+                        e.currentTarget.style.transform = 'scale(1.02)';
+                        e.currentTarget.style.boxShadow = '0 8px 24px rgba(0,0,0,0.12)';
+                    }}
+                    onMouseLeave={(e) => {
+                        e.currentTarget.style.transform = 'scale(1)';
+                        e.currentTarget.style.boxShadow = 'none';
+                    }}
+                >
+                    <img
+                        src={resolvedUrl}
+                        alt={label}
+                        loading="lazy"
+                        decoding="async"
+                        style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                    />
+                    <div style={{
+                        position: 'absolute', top: 8, right: 8,
+                        background: 'rgba(0,0,0,0.6)', borderRadius: 8,
+                        padding: 6, color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center'
+                    }}>
+                        <ZoomIn size={16} />
+                    </div>
+                </div>
+            ) : (
+                <div style={{ height: 160, borderRadius: 12, border: '1px dashed #cbd5e1', background: '#f8fafc', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#94a3b8', flexDirection: 'column', gap: 8 }}>
+                    <ImageIcon size={32} strokeWidth={1.5} />
+                    <span style={{ fontSize: 12 }}>Chưa có ảnh</span>
+                </div>
+            )}
+        </div>
+    );
+};
+
+// ────────────────────────────────────────────────────────────────────────────
+
 const statusConfig = {
     'COMPLETED': { icon: <CheckCircle2 size={16} />, color: '#16a34a', bg: '#dcfce7', label: 'Hoàn tất nhập kho' },
     'IN_PROGRESS': { icon: <ClipboardCheck size={16} />, color: '#ca8a04', bg: '#fef9c3', label: 'Đang chờ QC' },
@@ -40,7 +113,7 @@ export default function TradeInDetailPage() {
     const [imageModal, setImageModal] = useState<{ url: string; title: string } | null>(null);
     const [showAllImages, setShowAllImages] = useState(false);
     const [isEditing, setIsEditing] = useState(false);
-    const [editForm, setEditForm] = useState<any>({});
+    const [editForm, setEditForm] = useState<Partial<InboundItem>>({});
     const [showLabel, setShowLabel] = useState(false);
     const [isUploadingDeviceImages, setIsUploadingDeviceImages] = useState(false);
     const [isUploadingCccdFront, setIsUploadingCccdFront] = useState(false);
@@ -52,8 +125,6 @@ export default function TradeInDetailPage() {
         queryFn: () => inboundApi.getRequestById(id!),
         enabled: !!id
     });
-
-    console.log('TradeInDetailPage:', { id, isLoading, isError, error, request, items: request?.items });
 
     const receiveMutation = useMutation({
         mutationFn: () => inboundApi.receiveItems(id!),
@@ -80,8 +151,7 @@ export default function TradeInDetailPage() {
     });
 
     const updateMutation = useMutation({
-        mutationFn: (data: any) => {
-            // Update the item-level data using the first item's ID
+        mutationFn: (data: Partial<InboundItem>) => {
             const itemId = request?.items?.[0]?.id;
             if (!itemId) throw new Error('Item ID not found');
             return inboundApi.updateItem(itemId, data);
@@ -95,6 +165,13 @@ export default function TradeInDetailPage() {
             alert(err?.response?.data?.message || 'Lỗi khi cập nhật');
         }
     });
+
+    useEffect(() => {
+        if (showLabel) {
+            window.print();
+            setShowLabel(false);
+        }
+    }, [showLabel]);
 
     if (isLoading) {
         return <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '100vh', color: '#64748b', fontSize: 16 }}>
@@ -139,7 +216,7 @@ export default function TradeInDetailPage() {
         imageUrl, deviceImages, cccdFrontUrl, cccdBackUrl,
         receivedAt,
         serialItem,
-    } = item as any;
+    } = item;
 
     const currentImageUrl = isEditing ? editForm.imageUrl : imageUrl;
     const currentDeviceImages = isEditing ? editForm.deviceImages : deviceImages;
@@ -200,6 +277,15 @@ export default function TradeInDetailPage() {
         setIsEditing(true);
     };
 
+    const handleDeleteDeviceImage = (urlToDelete: string) => {
+        const remaining = allDeviceImages.filter(u => u !== urlToDelete);
+        setEditForm(p => ({
+            ...p,
+            imageUrl: remaining[0] || undefined,
+            deviceImages: remaining.length > 0 ? JSON.stringify(remaining) : undefined,
+        }));
+    };
+
     const handleUploadDeviceImages = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const files = Array.from(e.target.files || []);
         if (files.length === 0) return;
@@ -207,7 +293,7 @@ export default function TradeInDetailPage() {
         try {
             const urls = await uploadApi.uploadImages(files);
             const merged = Array.from(new Set([...(parsedDeviceImages || []), ...urls]));
-            setEditForm((p: any) => ({
+            setEditForm((p) => ({
                 ...p,
                 imageUrl: merged[0],
                 deviceImages: JSON.stringify(merged),
@@ -226,7 +312,7 @@ export default function TradeInDetailPage() {
         setIsUploadingCccdFront(true);
         try {
             const url = await uploadApi.uploadImage(file);
-            setEditForm((p: any) => ({ ...p, cccdFrontUrl: url }));
+            setEditForm((p) => ({ ...p, cccdFrontUrl: url }));
         } catch (err: any) {
             alert(err?.message || 'Lỗi tải lên CCCD mặt trước');
         } finally {
@@ -241,7 +327,7 @@ export default function TradeInDetailPage() {
         setIsUploadingCccdBack(true);
         try {
             const url = await uploadApi.uploadImage(file);
-            setEditForm((p: any) => ({ ...p, cccdBackUrl: url }));
+            setEditForm((p) => ({ ...p, cccdBackUrl: url }));
         } catch (err: any) {
             alert(err?.message || 'Lỗi tải lên CCCD mặt sau');
         } finally {
@@ -261,27 +347,6 @@ export default function TradeInDetailPage() {
         setEditForm({});
     };
 
-    const Card = ({ title, icon, children }: { title: string, icon: React.ReactNode, children: React.ReactNode }) => (
-        <div style={{ background: '#fff', borderRadius: 16, border: '1px solid #f1f5f9', boxShadow: '0 4px 20px rgba(0,0,0,0.03)', overflow: 'hidden' }}>
-            <div style={{ padding: '16px 20px', borderBottom: '1px solid #f1f5f9', display: 'flex', alignItems: 'center', gap: 10, background: '#fafbff' }}>
-                <div style={{ color: '#6366f1' }}>{icon}</div>
-                <h3 style={{ margin: 0, fontSize: 14, fontWeight: 700, color: '#1e293b' }}>{title}</h3>
-            </div>
-            <div style={{ padding: 20 }}>
-                {children}
-            </div>
-        </div>
-    );
-
-    const InfoRow = ({ label, value, highlight = false }: { label: string, value: string | React.ReactNode, highlight?: boolean }) => (
-        <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px dashed #f1f5f9' }}>
-            <span style={{ color: '#64748b', fontSize: 13 }}>{label}</span>
-            <span style={{ color: highlight ? '#6366f1' : '#0f172a', fontSize: 13, fontWeight: highlight ? 700 : 500, textAlign: 'right', maxWidth: '60%' }}>
-                {value || '—'}
-            </span>
-        </div>
-    );
-
     const EditableInfoRow = ({ label, fieldName, value, type = 'text', highlight = false }: {
         label: string,
         fieldName: string,
@@ -298,7 +363,7 @@ export default function TradeInDetailPage() {
                 <span style={{ color: '#64748b', fontSize: 13 }}>{label}</span>
                 <input
                     type={type}
-                    value={editForm[fieldName] || ''}
+                    value={(editForm as Record<string, unknown>)[fieldName] as string | number || ''}
                     onChange={(e) => setEditForm({ ...editForm, [fieldName]: type === 'number' ? Number(e.target.value) : e.target.value })}
                     style={{
                         padding: '6px 10px', fontSize: 13, borderRadius: 6,
@@ -310,64 +375,12 @@ export default function TradeInDetailPage() {
         );
     };
 
-    const ImgPreview = ({ url, label }: { url: string, label: string }) => {
-        const resolvedUrl = resolveImageUrl(url);
-        return (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            <span style={{ fontSize: 12, fontWeight: 600, color: '#64748b' }}>{label}</span>
-            {url ? (
-                <div
-                    onClick={() => setImageModal({ url: resolvedUrl, title: label })}
-                    style={{
-                        display: 'block', borderRadius: 12, overflow: 'hidden',
-                        border: '1px solid #e2e8f0', height: 160, width: '100%',
-                        background: '#f8fafc', cursor: 'pointer', position: 'relative',
-                        transition: 'all 0.2s ease'
-                    }}
-                    onMouseEnter={(e) => {
-                        e.currentTarget.style.transform = 'scale(1.02)';
-                        e.currentTarget.style.boxShadow = '0 8px 24px rgba(0,0,0,0.12)';
-                    }}
-                    onMouseLeave={(e) => {
-                        e.currentTarget.style.transform = 'scale(1)';
-                        e.currentTarget.style.boxShadow = 'none';
-                    }}
-                >
-                    <img
-                        src={resolvedUrl}
-                        alt={label}
-                        loading="lazy"
-                        decoding="async"
-                        style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                    />
-                    <div style={{
-                        position: 'absolute', top: 8, right: 8,
-                        background: 'rgba(0,0,0,0.6)', borderRadius: 8,
-                        padding: 6, color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center'
-                    }}>
-                        <ZoomIn size={16} />
-                    </div>
-                </div>
-            ) : (
-                <div style={{ height: 160, borderRadius: 12, border: '1px dashed #cbd5e1', background: '#f8fafc', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#94a3b8', flexDirection: 'column', gap: 8 }}>
-                    <ImageIcon size={32} strokeWidth={1.5} />
-                    <span style={{ fontSize: 12 }}>Chưa có ảnh</span>
-                </div>
-            )}
-        </div>
-    );
-    };
-
     const handlePrint = () => {
         window.print();
     };
 
     const handlePrintLabel = () => {
         setShowLabel(true);
-        setTimeout(() => {
-            window.print();
-            setShowLabel(false);
-        }, 500);
     };
 
     // Helper to parse RAM/ROM from title (fallback)
@@ -938,6 +951,20 @@ export default function TradeInDetailPage() {
                                             }}>
                                                 {idx + 1}
                                             </div>
+                                            {isEditing && (
+                                                <button
+                                                    type="button"
+                                                    onClick={(e) => { e.stopPropagation(); handleDeleteDeviceImage(url); }}
+                                                    style={{
+                                                        position: 'absolute', top: 6, left: 6,
+                                                        background: '#ef4444', border: 'none', borderRadius: 6,
+                                                        width: 24, height: 24, display: 'flex', alignItems: 'center',
+                                                        justifyContent: 'center', cursor: 'pointer', color: '#fff',
+                                                    }}
+                                                >
+                                                    <X size={13} />
+                                                </button>
+                                            )}
                                         </div>
                                     ))}
                                     {!showAllImages && remainingCount > 0 && (
@@ -964,8 +991,24 @@ export default function TradeInDetailPage() {
                             <div style={{ gridColumn: '1 / -1', marginTop: 8, fontSize: 12, fontWeight: 700, color: '#64748b' }}>
                                 CCCD
                             </div>
-                            <ImgPreview url={currentCccdFrontUrl || ''} label="CCCD mặt trước" />
-                            <ImgPreview url={currentCccdBackUrl || ''} label="CCCD mặt sau" />
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                                <ImgPreview url={currentCccdFrontUrl || ''} label="CCCD mặt trước" onZoom={(url, title) => setImageModal({ url, title })} />
+                                {isEditing && currentCccdFrontUrl && (
+                                    <button type="button" onClick={() => setEditForm(p => ({ ...p, cccdFrontUrl: undefined }))}
+                                        style={{ padding: '4px 10px', background: '#fee2e2', color: '#ef4444', border: '1px solid #fca5a5', borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
+                                        <X size={12} style={{ display: 'inline', marginRight: 4 }} />Xóa ảnh
+                                    </button>
+                                )}
+                            </div>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                                <ImgPreview url={currentCccdBackUrl || ''} label="CCCD mặt sau" onZoom={(url, title) => setImageModal({ url, title })} />
+                                {isEditing && currentCccdBackUrl && (
+                                    <button type="button" onClick={() => setEditForm(p => ({ ...p, cccdBackUrl: undefined }))}
+                                        style={{ padding: '4px 10px', background: '#fee2e2', color: '#ef4444', border: '1px solid #fca5a5', borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
+                                        <X size={12} style={{ display: 'inline', marginRight: 4 }} />Xóa ảnh
+                                    </button>
+                                )}
+                            </div>
                         </div>
                     </Card>
 
