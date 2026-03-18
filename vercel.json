@@ -1,7 +1,7 @@
 {
   "version": 2,
   "installCommand": "pnpm install",
-  "buildCommand": "pnpm --filter web build && pnpm --filter @celebi/backend build-production",
+  "buildCommand": "pnpm run build:vercel",
   "outputDirectory": "apps/web/dist",
   "framework": null,
   "devCommand": "cd apps/web && pnpm dev",
