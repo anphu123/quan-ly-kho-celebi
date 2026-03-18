@@ -1,8 +1,5 @@
 node_modules
 .turbo
-dist
-apps/backend
-packages
 *.log
 .env
 .env.local
@@ -10,3 +7,10 @@ packages
 coverage
 .vscode
 .idea
+apps/backend/dist
+apps/backend/uploads
+apps/backend/src
+apps/web/dist
+apps/web/src
+packages/*/src
+packages/*/dist
