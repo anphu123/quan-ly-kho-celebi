@@ -31,3 +31,6 @@ apps/backend/dist/
 
 # Coverage
 coverage/
+
+# pnpm store
+.pnpm-store/
