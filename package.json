@@ -18,7 +18,8 @@
     "format": "prettier --write \"**/*.{ts,tsx,md,json}\"",
     "db:migrate": "cd apps/backend && pnpm prisma migrate dev",
     "db:studio": "cd apps/backend && pnpm prisma studio",
-    "db:seed": "cd apps/backend && pnpm prisma db seed"
+    "db:seed": "cd apps/backend && pnpm prisma db seed",
+    "build:vercel": "(cd apps/web && pnpm build) && (cd apps/backend && pnpm run build-production)"
   },
   "devDependencies": {
     "@types/node": "^20.11.17",
