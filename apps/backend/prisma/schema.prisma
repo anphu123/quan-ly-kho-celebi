@@ -1,0 +1,894 @@
+// Serial-Based Second-Hand Electronics Management Schema
+// Specialized for IMEI/Serial tracking, QC grading, and asset lifecycle
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ===========================
+// IDENTITY & ACCESS MANAGEMENT  
+// ===========================
+
+enum UserRole {
+  SUPER_ADMIN // Quản trị hệ thống
+  QC_INSPECTOR // Nhân viên thẩm định QC ⭐ NEW
+  INVENTORY_MANAGER // Quản lý kho
+  TECHNICIAN // Kỹ thuật viên sửa chữa ⭐ NEW  
+  CASHIER // Thu ngân
+  ACCOUNTANT // Kế toán
+}
+
+model User {
+  id       String   @id @default(cuid())
+  email    String   @unique
+  password String
+  fullName String
+  role     UserRole @default(CASHIER)
+  isActive Boolean  @default(true)
+
+  lastLoginAt DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  // Relations for serial-based system
+  qcInspections      QCInspection[]
+  serialTransactions SerialTransaction[]
+  refurbishmentJobs  RefurbishmentJob[]
+  salesOrders        SalesOrder[]
+  inboundRequests    InboundRequest[] // Receiving operations
+  stockMovements     StockMovement[]  // Stock movements created ⭐ NEW
+
+  @@map("users")
+}
+
+// ===========================
+// PRODUCT CATALOG (Template-based)
+// ===========================
+
+enum ProductType {
+  ELECTRONICS // Điện tử (Phone, Laptop, Tablet)
+  APPLIANCE_LARGE // Điện máy lớn (Tivi, Tủ lạnh) 
+  APPLIANCE_SMALL // Gia dụng nhỏ (Bàn ủi, Máy xay)
+  COMPUTER // Máy tính & Linh kiện
+  ACCESSORY // Phụ kiện (Cáp, Ốp lưng)
+}
+
+enum TrackingMethod {
+  SERIAL_BASED // Quản lý theo Serial/IMEI ⭐ MAIN
+  QUANTITY_BASED // Quản lý theo số lượng (phụ kiện nhỏ)
+}
+
+model Category {
+  id             String         @id @default(cuid())
+  name           String // "Smartphone", "Laptop", "Tivi"
+  code           String         @unique
+  productType    ProductType
+  trackingMethod TrackingMethod @default(SERIAL_BASED)
+  description    String?
+  parentId       String?
+
+  // Hierarchy
+  parent   Category?  @relation("CategoryHierarchy", fields: [parentId], references: [id])
+  children Category[] @relation("CategoryHierarchy")
+
+  // Relations
+  productTemplates ProductTemplate[]
+  attributeGroups  AttributeGroup[] // Dynamic attributes ⭐ NEW
+  qcTemplates      QCTemplate[] // QC checklists ⭐ NEW
+  inboundItems     InboundItem[] // Receiving items
+  brandCategories  BrandCategory[] // Brand bindings ⭐ NEW
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("categories")
+}
+
+model Brand {
+  id   String  @id @default(cuid())
+  name String  @unique // "Apple", "Samsung", "LG"
+  code String  @unique
+  logo String?
+
+  productTemplates ProductTemplate[]
+  inboundItems     InboundItem[] // Receiving items
+  brandCategories  BrandCategory[] // Category bindings ⭐ NEW
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("brands")
+}
+
+// Brand <-> Category many-to-many (no recursion, explicit mapping)
+model BrandCategory {
+  id         String   @id @default(cuid())
+  brandId    String
+  categoryId String
+  assignedAt DateTime @default(now())
+
+  brand    Brand    @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  category Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  @@unique([brandId, categoryId])
+  @@index([categoryId])
+  @@index([brandId])
+  @@map("brand_categories")
+}
+
+// Product Template (thay cho Product table cũ)
+// Đây là "khuôn mẫu" sản phẩm, không lưu tồn kho
+// VD: "iPhone 15 Pro Max 256GB Natural Titanium"
+model ProductTemplate {
+  id          String  @id @default(cuid())
+  sku         String  @unique
+  name        String // "iPhone 15 Pro Max 256GB"
+  model       String? // "A3108" 
+  description String?
+  categoryId  String
+  brandId     String
+
+  // Pricing templates (base prices before grading)
+  baseWholesalePrice Decimal? @db.Decimal(15, 2) // Giá thu mua chuẩn Grade A
+  baseRetailPrice    Decimal? @db.Decimal(15, 2) // Giá bán chuẩn Grade A
+
+  // Metadata
+  image    String?
+  isActive Boolean @default(true)
+
+  // Relations
+  category Category @relation(fields: [categoryId], references: [id])
+  brand    Brand    @relation(fields: [brandId], references: [id])
+
+  serialItems   SerialItem[]     // Các cá thể thực tế ⭐ NEW
+  staticSpecs   ProductSpec[]    // Thông số cố định ⭐ NEW
+  inboundItems  InboundItem[]    // Receiving items
+  stockLevels   StockLevel[]     // Tồn kho tổng hợp ⭐ NEW
+  stockMovements StockMovement[] // Lịch sử xuất nhập ⭐ NEW
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("product_templates")
+}
+
+// ===========================
+// DYNAMIC ATTRIBUTES SYSTEM (EAV Pattern)
+// ===========================
+
+enum AttributeType {
+  TEXT // Màu sắc, Serial Number
+  NUMBER // Dung lượng Pin (mAh), RAM (GB)
+  DECIMAL // Kích thước màn hình (inch)
+  BOOLEAN // Có FaceID?, Có hộp?
+  SELECT // Độ phân giải (FHD/4K), Loại SIM
+  MULTISELECT // Cổng kết nối (USB-C, Lightning)
+  DATE // Ngày sản xuất
+}
+
+// Nhóm thuộc tính cho từng category
+// VD: Category "Smartphone" có AttributeGroup "Hardware Specs"
+model AttributeGroup {
+  id          String  @id @default(cuid())
+  categoryId  String
+  name        String // "Hardware Specs", "Physical Condition"
+  description String?
+  sortOrder   Int     @default(0)
+
+  category   Category    @relation(fields: [categoryId], references: [id])
+  attributes Attribute[] // Các thuộc tính trong nhóm
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("attribute_groups")
+}
+
+// Định nghĩa thuộc tính động
+// VD: "RAM", "Storage", "Screen Size", "Battery Health"
+model Attribute {
+  id               String        @id @default(cuid())
+  attributeGroupId String
+  key              String // "ram_gb", "storage_gb", "screen_inch"
+  name             String // "RAM (GB)", "Bộ nhớ trong", "Kích thước màn hình"
+  type             AttributeType
+  isRequired       Boolean       @default(false)
+  sortOrder        Int           @default(0)
+
+  // For SELECT/MULTISELECT types
+  options Json? // ["FHD", "4K", "8K"] for screen resolution
+
+  // Validation
+  minValue Decimal? // Min RAM: 1GB
+  maxValue Decimal? // Max RAM: 64GB
+
+  attributeGroup AttributeGroup @relation(fields: [attributeGroupId], references: [id])
+  productSpecs   ProductSpec[] // Giá trị của thuộc tính ⭐ NEW
+  dynamicSpecs   DynamicSpec[] // Dynamic values from serial items ⭐ NEW
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([attributeGroupId, key])
+  @@map("attributes")
+}
+
+// Giá trị thuộc tính cố định của ProductTemplate
+// VD: iPhone 15 Pro có RAM=8GB, Storage=256GB (cố định)
+model ProductSpec {
+  id                String @id @default(cuid())
+  productTemplateId String
+  attributeId       String
+  value             Json // Flexible value storage
+
+  productTemplate ProductTemplate @relation(fields: [productTemplateId], references: [id], onDelete: Cascade)
+  attribute       Attribute       @relation(fields: [attributeId], references: [id])
+
+  @@unique([productTemplateId, attributeId])
+  @@map("product_specs")
+}
+
+// ===========================
+// SERIAL ITEM MANAGEMENT ⭐ CORE
+// ===========================
+
+enum SerialStatus {
+  INCOMING // Vừa nhập, chờ QC
+  QC_IN_PROGRESS // Đang thẩm định  
+  AVAILABLE // Sẵn sàng bán
+  RESERVED // Đã đặt cọc
+  SOLD // Đã bán
+  REFURBISHING // Đang sửa chữa/tân trang
+  DAMAGED // Hỏng không sửa được
+  RETURNED // Hàng trả lại
+  DISPOSED // Đã thanh lý
+}
+
+enum Grade {
+  GRADE_A_NEW // 98-100% - Như mới, còn seal
+  GRADE_A // 95-97% - Rất đẹp, không trầy
+  GRADE_B_PLUS // 90-94% - Đẹp, trầy rất nhẹ
+  GRADE_B // 85-89% - Khá đẹp, vài vết trầy
+  GRADE_C_PLUS // 80-84% - Trầy nhiều nhưng dùng tốt
+  GRADE_C // 70-79% - Cấn móp, cần sửa nhỏ
+  GRADE_D // < 70% - Hỏng nặng, chỉ lấy linh kiện
+}
+
+// Cá thể sản phẩm - Bảng quan trọng nhất
+model SerialItem {
+  id                String @id @default(cuid())
+  productTemplateId String
+
+  // Unique identifiers
+  serialNumber String? @unique // Serial Number/IMEI
+  internalCode String  @unique // Mã nội bộ (nếu không có serial)
+
+  // Purchase information
+  source        String? // "TGDD", "FPT", "Trade-in customer"
+  purchasePrice Decimal   @db.Decimal(15, 2) // Giá thu mua thực tế
+  purchaseDate  DateTime?
+  purchaseBatch String? // Lô hàng nhập
+
+  // Current status
+  status         SerialStatus @default(INCOMING)
+  grade          Grade? // Phân loại sau QC
+  conditionNotes String? // Ghi chú tình trạng chi tiết
+
+  // Pricing (calculated from grade)
+  currentCostPrice Decimal @default(0) @db.Decimal(15, 2) // Giá vốn hiện tại (bao gồm sửa chữa)
+  suggestedPrice   Decimal @default(0) @db.Decimal(15, 2) // Giá bán đề xuất
+
+  // Physical location
+  warehouseId String
+  binLocation String? // "A-1-02" (Khu A, Kệ 1, Vị trí 02) ⭐ NEW
+
+  // Relations
+  productTemplate ProductTemplate @relation(fields: [productTemplateId], references: [id])
+  warehouse       Warehouse       @relation(fields: [warehouseId], references: [id])
+
+  qcInspections     QCInspection[] // Lịch sử thẩm định
+  dynamicSpecs      DynamicSpec[] // Thông số động (VD: % pin)
+  transactions      SerialTransaction[] // Lịch sử giao dịch
+  refurbishmentJobs RefurbishmentJob[] // Lịch sử sửa chữa
+  salesOrderItems   SalesOrderItem[] // Đã bán trong đơn nào
+  inboundItem       InboundItem? // Source from receiving
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("serial_items")
+}
+
+// Thông số động của từng cá thể (thay đổi theo thời gian)
+// VD: % pin của iPhone này giảm từ 95% xuống 90% sau 6 tháng
+model DynamicSpec {
+  id           String   @id @default(cuid())
+  serialItemId String
+  attributeId  String
+  value        Json // % pin hiện tại, tình trạng loa...
+  recordedAt   DateTime @default(now())
+  recordedById String? // Ai ghi nhận (QC, Technician...)
+
+  serialItem SerialItem @relation(fields: [serialItemId], references: [id], onDelete: Cascade)
+  attribute  Attribute  @relation(fields: [attributeId], references: [id])
+
+  @@index([serialItemId, attributeId, recordedAt])
+  @@map("dynamic_specs")
+}
+
+// ===========================
+// QC & INSPECTION SYSTEM ⭐ NEW
+// ===========================
+
+// Template checklist cho từng category
+model QCTemplate {
+  id          String  @id @default(cuid())
+  categoryId  String
+  name        String // "Smartphone QC Checklist", "Tivi Inspection Form"
+  description String?
+  version     String  @default("1.0")
+  isActive    Boolean @default(true)
+
+  category    Category       @relation(fields: [categoryId], references: [id])
+  checkItems  QCCheckItem[] // Các mục cần check
+  inspections QCInspection[] // Lịch sử sử dụng template này
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("qc_templates")
+}
+
+enum CheckItemType {
+  VISUAL_CHECK // Kiểm tra bằng mắt (trầy xước)
+  FUNCTION_TEST // Test chức năng (loa, mic)
+  MEASUREMENT // Đo đạc (% pin, nhiệt độ)
+  ACCESSORY_COUNT // Kiểm đếm phụ kiện
+}
+
+// Từng mục check trong template
+model QCCheckItem {
+  id          String        @id @default(cuid())
+  templateId  String
+  section     String // "Exterior", "Hardware", "Software", "Accessories"
+  item        String // "Front screen scratches", "FaceID function"
+  type        CheckItemType
+  description String? // Hướng dẫn check chi tiết
+  isRequired  Boolean       @default(false)
+  sortOrder   Int           @default(0)
+
+  // Scoring
+  maxScore      Int     @default(100) // Điểm tối đa cho mục này
+  gradingImpact Decimal @default(1.0) // Trọng số ảnh hưởng đến Grade
+
+  template QCTemplate         @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  results  QCInspectionItem[] // Kết quả check thực tế
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("qc_check_items")
+}
+
+enum InspectionStatus {
+  PENDING // Chưa check
+  COMPLETED // Đã hoàn thành
+  FAILED // Fail (hỏng nặng)
+}
+
+// Phiếu thẩm định cụ thể cho 1 serial item
+model QCInspection {
+  id           String           @id @default(cuid())
+  serialItemId String
+  templateId   String
+  inspectorId  String
+  status       InspectionStatus @default(PENDING)
+
+  // Results
+  totalScore     Decimal? @db.Decimal(5, 2) // Tổng điểm (0-100)
+  suggestedGrade Grade? // Grade đề xuất
+  finalGrade     Grade? // Grade chốt (có thể khác với đề xuất)
+  notes          String? // Ghi chú tổng quát
+
+  // Timing
+  startedAt   DateTime  @default(now())
+  completedAt DateTime?
+
+  serialItem SerialItem         @relation(fields: [serialItemId], references: [id])
+  template   QCTemplate         @relation(fields: [templateId], references: [id])
+  inspector  User               @relation(fields: [inspectorId], references: [id])
+  items      QCInspectionItem[] // Kết quả từng mục
+
+  @@map("qc_inspections")
+}
+
+// Kết quả check từng mục cụ thể
+model QCInspectionItem {
+  id           String @id @default(cuid())
+  inspectionId String
+  checkItemId  String
+
+  // Results
+  score  Int? // Điểm đạt được (0 = fail, maxScore = perfect)
+  passed Boolean @default(true)
+  notes  String? // Ghi chú chi tiết
+  photos Json? // URLs ảnh chụp lỗi
+
+  inspection QCInspection @relation(fields: [inspectionId], references: [id], onDelete: Cascade)
+  checkItem  QCCheckItem  @relation(fields: [checkItemId], references: [id])
+
+  checkedAt DateTime @default(now())
+
+  @@unique([inspectionId, checkItemId])
+  @@map("qc_inspection_items")
+}
+
+// ===========================
+// WAREHOUSE & LOCATION ⭐ ENHANCED
+// ===========================
+
+model Warehouse {
+  id       String  @id @default(cuid())
+  code     String  @unique
+  name     String
+  address  String?
+  phone    String?
+  isActive Boolean @default(true)
+
+  // Enhanced for large items
+  totalArea   Decimal? @db.Decimal(10, 2) // m2
+  maxCapacity Int? // Số lượng máy lớn tối đa
+
+  serialItems     SerialItem[]     // Các serial item trong kho
+  binLocations    BinLocation[]    // Vị trí chi tiết ⭐ NEW
+  salesOrders     SalesOrder[]
+  inboundRequests InboundRequest[] // Receiving operations
+  stockLevels     StockLevel[]     // Tồn kho tổng hợp ⭐ NEW
+  stockMovements  StockMovement[]  // Lịch sử xuất nhập ⭐ NEW
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("warehouses")
+}
+
+enum LocationType {
+  SHELF // Kệ (điện thoại, laptop)
+  FLOOR // Sàn (tủ lạnh, tivi lớn)
+  CABINET // Tủ kín (linh kiện giá trị cao)
+  REPAIR // Khu sửa chữa
+  QC_AREA // Khu thẩm định
+}
+
+// Vị trí chi tiết trong kho
+model BinLocation {
+  id          String       @id @default(cuid())
+  warehouseId String
+  code        String // "A-1-05", "FLOOR-B-12"
+  name        String // "Kệ A Tầng 1 Vị trí 05"
+  type        LocationType @default(SHELF)
+
+  // Capacity
+  maxItems  Int? // Số lượng tối đa (cho kệ nhỏ)
+  maxWeight Decimal? @db.Decimal(10, 2) // Kg (cho sàn)
+
+  // Current usage  
+  currentItems Int     @default(0)
+  isActive     Boolean @default(true)
+
+  warehouse Warehouse @relation(fields: [warehouseId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([warehouseId, code])
+  @@map("bin_locations")
+}
+
+// ===========================
+// REFURBISHMENT & REPAIR ⭐ NEW
+// ===========================
+
+enum RefurbStatus {
+  PLANNED // Lên kế hoạch sửa
+  IN_PROGRESS // Đang sửa
+  COMPLETED // Hoàn thành  
+  FAILED // Không sửa được
+  CANCELLED // Hủy
+}
+
+// Job sửa chữa/tân trang
+model RefurbishmentJob {
+  id           String       @id @default(cuid())
+  serialItemId String
+  technicianId String
+  status       RefurbStatus @default(PLANNED)
+
+  // Planning
+  issuesFound   String // Vấn đề phát hiện
+  plannedWork   String // Kế hoạch sửa chữa
+  estimatedCost Decimal @db.Decimal(15, 2)
+
+  // Execution  
+  actualWork String? // Công việc đã làm
+  actualCost Decimal @default(0) @db.Decimal(15, 2)
+
+  // Timing
+  startedAt   DateTime?
+  completedAt DateTime?
+
+  serialItem SerialItem  @relation(fields: [serialItemId], references: [id])
+  technician User        @relation(fields: [technicianId], references: [id])
+  partUsages PartUsage[] // Linh kiện sử dụng
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("refurbishment_jobs")
+}
+
+// Sử dụng linh kiện trong sửa chữa
+model PartUsage {
+  id       String  @id @default(cuid())
+  jobId    String
+  partName String // "Pin iPhone 15", "Màn hình Samsung S23"
+  quantity Int     @default(1)
+  unitCost Decimal @db.Decimal(15, 2)
+
+  job RefurbishmentJob @relation(fields: [jobId], references: [id], onDelete: Cascade)
+
+  @@map("part_usages")
+}
+
+// ===========================
+// TRANSACTION & MOVEMENT TRACKING ⭐ NEW
+// ===========================
+
+enum TransactionType {
+  INBOUND // Nhập kho từ supplier
+  QC_START // Bắt đầu QC
+  QC_COMPLETE // Hoàn thành QC
+  MOVE_TO_REFURB // Chuyển sang sửa chữa
+  REFURB_COMPLETE // Sửa xong
+  MOVE_TO_SALE // Chuyển sang khu bán
+  RESERVED // Khách đặt cọc
+  SOLD // Đã bán
+  RETURNED // Trả hàng
+  DISPOSAL // Thanh lý
+}
+
+// Lịch sử di chuyển của serial item
+model SerialTransaction {
+  id           String          @id @default(cuid())
+  serialItemId String
+  type         TransactionType
+
+  // Location change
+  fromLocation String? // Vị trí cũ
+  toLocation   String? // Vị trí mới
+
+  // Status change
+  fromStatus SerialStatus?
+  toStatus   SerialStatus?
+
+  // Financial impact
+  costChange Decimal? @db.Decimal(15, 2) // Thay đổi giá vốn
+
+  notes         String?
+  performedById String
+
+  serialItem  SerialItem @relation(fields: [serialItemId], references: [id], onDelete: Cascade)
+  performedBy User       @relation(fields: [performedById], references: [id])
+
+  createdAt DateTime @default(now())
+
+  @@index([serialItemId, createdAt])
+  @@map("serial_transactions")
+}
+
+// ===========================
+// SIMPLIFIED SALES (Serial-focused)
+// ===========================
+
+enum SalesOrderStatus {
+  DRAFT // Nháp
+  CONFIRMED // Xác nhận
+  DELIVERED // Đã giao
+  COMPLETED // Hoàn thành
+  CANCELLED // Hủy
+}
+
+model Customer {
+  id       String  @id @default(cuid())
+  code     String  @unique
+  fullName String
+  phone    String?
+  email    String?
+  address  String?
+
+  salesOrders SalesOrder[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("customers")
+}
+
+model SalesOrder {
+  id          String           @id @default(cuid())
+  code        String           @unique
+  customerId  String?
+  warehouseId String
+  status      SalesOrderStatus @default(DRAFT)
+
+  // Totals
+  totalAmount Decimal @db.Decimal(15, 2)
+  paidAmount  Decimal @default(0) @db.Decimal(15, 2)
+
+  notes         String?
+  salesPersonId String?
+
+  customer    Customer?        @relation(fields: [customerId], references: [id])
+  warehouse   Warehouse        @relation(fields: [warehouseId], references: [id])
+  salesPerson User?            @relation(fields: [salesPersonId], references: [id])
+  items       SalesOrderItem[] // Serial items bán
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("sales_orders")
+}
+
+model SalesOrderItem {
+  id           String @id @default(cuid())
+  salesOrderId String
+  serialItemId String
+
+  unitPrice  Decimal @db.Decimal(15, 2) // Giá bán cụ thể
+  discount   Decimal @default(0) @db.Decimal(15, 2)
+  finalPrice Decimal @db.Decimal(15, 2) // Giá sau giảm
+
+  salesOrder SalesOrder @relation(fields: [salesOrderId], references: [id], onDelete: Cascade)
+  serialItem SerialItem @relation(fields: [serialItemId], references: [id])
+
+  @@unique([salesOrderId, serialItemId]) // 1 serial item chỉ bán 1 lần trong 1 đơn
+  @@map("sales_order_items")
+}
+
+// ===========================
+// SUPPLIER MANAGEMENT
+// ===========================
+
+model Supplier {
+  id            String   @id @default(cuid())
+  code          String   @unique // SUP-001
+  name          String   // Tên nhà cung cấp
+  contactPerson String?  // Người liên hệ
+  phone         String?
+  email         String?
+  address       String?
+  taxCode       String?  // Mã số thuế
+  bankAccount   String?  // Tài khoản ngân hàng
+  notes         String?
+  isActive      Boolean  @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("suppliers")
+}
+
+// ===========================
+// INBOUND/RECEIVING MODULE ⭐ NEW
+// ===========================
+
+enum InboundStatus {
+  REQUESTED // Yêu cầu nhập hàng
+  IN_PROGRESS // Đang nhận hàng
+  COMPLETED // Hoàn thành
+  CANCELLED // Hủy bỏ
+}
+
+enum SupplierType {
+  CUSTOMER_TRADE_IN // Khách hàng đổi cũ lấy mới
+  INTERNAL_RETURN // Hàng trả lại nội bộ  
+  LIQUIDATION // Thanh lý từ doanh nghiệp
+  INDIVIDUAL_SELLER // Người bán lẻ
+}
+
+model InboundRequest {
+  id           String        @id @default(cuid())
+  code         String        @unique // INB-2024-001
+  warehouseId  String
+  status       InboundStatus @default(REQUESTED)
+  
+  // Supplier information
+  supplierType SupplierType
+  supplierName String       // Tên người/công ty cung cấp
+  supplierPhone String?
+  supplierEmail String?
+  
+  // Receiving details
+  expectedDate DateTime?    // Ngày dự kiến nhận
+  receivedDate DateTime?    // Ngày thực nhận
+  
+  // Financial
+  totalEstimatedValue Decimal? @db.Decimal(15, 2) // Tổng giá trị ước tính
+  totalActualValue    Decimal? @db.Decimal(15, 2) // Tổng giá trị thực tế
+  
+  notes String?
+  receivedById String? // Người nhận hàng
+  
+  warehouse  Warehouse     @relation(fields: [warehouseId], references: [id])
+  receivedBy User?         @relation(fields: [receivedById], references: [id])
+  items      InboundItem[] // Các item trong lô hàng
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  @@index([status, expectedDate])
+  @@map("inbound_requests")
+}
+
+model InboundItem {
+  id              String @id @default(cuid())
+  inboundRequestId String 
+  
+  // Product information
+  productTemplateId String?    // Template sản phẩm (nếu có)
+  categoryId        String
+  brandId           String?
+  
+  // Item details
+  serialNumber      String?    // IMEI/Serial number
+  modelName         String     // "iPhone 15 Pro 256GB"
+  condition         String?    // "Tốt", "Khá", "Cần sửa chữa"
+  
+  // Initial assessment
+  estimatedValue    Decimal?   @db.Decimal(15, 2) // Giá trị ước tính khi nhận
+  notes             String?    // Ghi chú về tình trạng
+  
+  // Trade-in specific info (from Excel)
+  sourceCustomerName    String?  // TÊN KHÁCH HÀNG
+  sourceCustomerPhone   String?  // SỐ ĐIỆN THOẠI
+  sourceCustomerAddress String?  // ĐỊA CHỈ
+  sourceCustomerIdCard  String?  // CCCD SỐ
+  idCardIssueDate       DateTime?// Ngày cấp CCCD
+  idCardIssuePlace      String?  // Nơi cấp CCCD
+  bankAccount           String?  // SỐ TÀI KHOẢN CỦA KHÁCH
+  bankName              String?  // TẠI NGÂN HÀNG
+  
+  contractNumber        String?  // SỐ HỢP ĐỒNG
+  purchaseDate          DateTime?// NGÀY MUA
+  employeeName          String?  // TÊN NHÂN VIÊN
+  
+  otherCosts            Decimal? @db.Decimal(15, 2) // chi phí khác
+  topUp                 Decimal? @db.Decimal(15, 2) // TOP UP
+  repairCost            Decimal? @db.Decimal(15, 2) // GIÁ SỬA CHỮA
+  imageUrl              String?  // Hình ảnh thiết bị (ảnh chính)
+  deviceImages          String?  // JSON array các ảnh thiết bị
+  cccdFrontUrl          String?  // Ảnh CCCD mặt trước
+  cccdBackUrl           String?  // Ảnh CCCD mặt sau
+  
+  // Receiving details  
+  isReceived        Boolean    @default(false)
+  receivedAt        DateTime?
+  
+  // Generated SerialItem after QC
+  serialItemId      String?    @unique // Link to created SerialItem
+  
+  inboundRequest  InboundRequest   @relation(fields: [inboundRequestId], references: [id], onDelete: Cascade)
+  productTemplate ProductTemplate? @relation(fields: [productTemplateId], references: [id])
+  category        Category         @relation(fields: [categoryId], references: [id])
+  brand           Brand?           @relation(fields: [brandId], references: [id])
+  serialItem      SerialItem?      @relation(fields: [serialItemId], references: [id])
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  @@index([inboundRequestId, isReceived])
+  @@map("inbound_items")
+}
+
+
+// ===========================
+// STOCK LEVEL & MOVEMENT TRACKING ⭐ NEW
+// ===========================
+
+// Tồn kho tổng hợp theo sản phẩm/kho/grade
+model StockLevel {
+  id                String   @id @default(cuid())
+  productTemplateId String
+  warehouseId       String
+  grade             Grade?
+  
+  // ===== TỒN KHO THEO TRẠNG THÁI =====
+  // Tồn vật lý = tổng tất cả trong kho
+  physicalQty       Int      @default(0)
+  
+  // Phân tích chi tiết theo status
+  incomingQty       Int      @default(0) // INCOMING - Chờ QC
+  qcInProgressQty   Int      @default(0) // QC_IN_PROGRESS - Đang thẩm định
+  availableQty      Int      @default(0) // AVAILABLE - Sẵn sàng bán ⭐ QUAN TRỌNG
+  reservedQty       Int      @default(0) // RESERVED - Đã đặt trước
+  refurbishingQty   Int      @default(0) // REFURBISHING - Đang sửa chữa
+  damagedQty        Int      @default(0) // DAMAGED - Hỏng
+  returnedQty       Int      @default(0) // RETURNED - Trả lại
+  
+  // physicalQty = sum of all above
+  // availableQty = số lượng có thể bán ngay
+  
+  // ===== GIÁ TRỊ =====
+  averageCost       Decimal  @db.Decimal(15, 2)
+  totalValue        Decimal  @db.Decimal(15, 2)
+  
+  // ===== NGƯỠNG CẢNH BÁO =====
+  minStockLevel     Int      @default(5)
+  maxStockLevel     Int      @default(100)
+  reorderPoint      Int      @default(10)
+  
+  // Relations
+  productTemplate ProductTemplate @relation(fields: [productTemplateId], references: [id], onDelete: Cascade)
+  warehouse       Warehouse       @relation(fields: [warehouseId], references: [id], onDelete: Cascade)
+  
+  lastUpdated DateTime @updatedAt
+  createdAt   DateTime @default(now())
+  
+  @@unique([productTemplateId, warehouseId, grade])
+  @@index([warehouseId, availableQty])
+  @@index([productTemplateId, physicalQty])
+  @@map("stock_levels")
+}
+
+enum MovementType {
+  IN           // Nhập kho
+  OUT          // Xuất kho
+  TRANSFER_OUT // Chuyển đi
+  TRANSFER_IN  // Chuyển đến
+  ADJUSTMENT   // Điều chỉnh kiểm kê
+  RESERVE      // Đặt trước
+  UNRESERVE    // Hủy đặt trước
+}
+
+// Lịch sử xuất nhập tồn
+model StockMovement {
+  id                String       @id @default(cuid())
+  productTemplateId String
+  warehouseId       String
+  
+  type              MovementType
+  quantity          Int          // +/- số lượng
+  
+  // Reference to source document
+  referenceType     String?      // "INBOUND", "SALES", "OUTBOUND", "TRANSFER", "ADJUSTMENT"
+  referenceId       String?      // ID của phiếu nguồn
+  serialItemId      String?      // Link to specific serial item
+  
+  // Financial
+  unitCost          Decimal      @db.Decimal(15, 2)
+  totalValue        Decimal      @db.Decimal(15, 2)
+  
+  // Stock level snapshot
+  balanceBefore     Int          // Tồn trước khi di chuyển
+  balanceAfter      Int          // Tồn sau khi di chuyển
+  
+  notes             String?
+  createdById       String
+  
+  // Relations
+  productTemplate ProductTemplate @relation(fields: [productTemplateId], references: [id], onDelete: Cascade)
+  warehouse       Warehouse       @relation(fields: [warehouseId], references: [id], onDelete: Cascade)
+  createdBy       User            @relation(fields: [createdById], references: [id])
+  
+  createdAt DateTime @default(now())
+  
+  @@index([productTemplateId, warehouseId, createdAt])
+  @@index([referenceType, referenceId])
+  @@index([serialItemId])
+  @@map("stock_movements")
+}

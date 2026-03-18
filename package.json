@@ -1,0 +1,34 @@
+{
+  "name": "quan-ly-kho-celebi",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Hệ thống Quản lý Xuất - Nhập - Tồn & Bán hàng",
+  "author": "Celebi Team",
+  "license": "MIT",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "turbo run dev",
+    "build": "turbo run build",
+    "lint": "turbo run lint",
+    "test": "turbo run test",
+    "clean": "turbo run clean && rm -rf node_modules",
+    "format": "prettier --write \"**/*.{ts,tsx,md,json}\"",
+    "db:migrate": "cd apps/backend && pnpm prisma migrate dev",
+    "db:studio": "cd apps/backend && pnpm prisma studio",
+    "db:seed": "cd apps/backend && pnpm prisma db seed"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.17",
+    "prettier": "^3.2.5",
+    "turbo": "^1.12.4",
+    "typescript": "^5.3.3"
+  },
+  "engines": {
+    "node": ">=20.0.0",
+    "pnpm": ">=8.0.0"
+  },
+  "packageManager": "pnpm@8.15.1"
+}
