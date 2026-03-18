@@ -214,7 +214,6 @@ export class MasterdataService {
             }
             await this.prisma.brandCategory.createMany({
                 data: data.brandIds.map((brandId: string) => ({ brandId, categoryId: created.id })),
-                skipDuplicates: true
             });
         }
 
@@ -269,7 +268,6 @@ export class MasterdataService {
             if (data.brandIds.length > 0) {
                 await this.prisma.brandCategory.createMany({
                     data: data.brandIds.map((brandId: string) => ({ brandId, categoryId: id })),
-                    skipDuplicates: true
                 });
             }
         }
@@ -379,7 +377,6 @@ export class MasterdataService {
             }
             await this.prisma.brandCategory.createMany({
                 data: data.categoryIds.map((categoryId: string) => ({ brandId: created.id, categoryId })),
-                skipDuplicates: true
             });
         }
 
@@ -425,7 +422,6 @@ export class MasterdataService {
             if (data.categoryIds.length > 0) {
                 await this.prisma.brandCategory.createMany({
                     data: data.categoryIds.map((categoryId: string) => ({ brandId: id, categoryId })),
-                    skipDuplicates: true
                 });
             }
         }
