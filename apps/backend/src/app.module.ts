@@ -1,7 +1,9 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
+import { MongooseModule } from '@nestjs/mongoose';
 import { ThrottlerModule } from '@nestjs/throttler';
 import { PrismaModule } from './prisma/prisma.module';
+import { mongoConfig } from './config/mongodb.config';
 import { AuthModule } from './modules/auth/auth.module';
 import { SerialItemsModule } from './modules/serial-items/serial-items.module';
 import { QCInspectionModule } from './modules/qc-inspection/qc-inspection.module';
@@ -29,6 +31,7 @@ import { OutboundModule } from './modules/outbound/outbound.module';
     ]),
 
     // Database
+    MongooseModule.forRoot(mongoConfig.getUri(), mongoConfig.options),
     PrismaModule,
 
     // Feature modules  
