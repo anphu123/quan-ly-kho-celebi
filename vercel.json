@@ -1,7 +1,7 @@
 {
   "version": 2,
   "installCommand": "pnpm install",
-  "buildCommand": "cd apps/web && pnpm build && cd ../backend && pnpm exec prisma generate && pnpm exec nest build",
+  "buildCommand": "pnpm --filter web build && pnpm --filter @celebi/backend build-production",
   "outputDirectory": "apps/web/dist",
   "framework": null,
   "devCommand": "cd apps/web && pnpm dev",
