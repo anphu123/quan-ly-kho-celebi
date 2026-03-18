@@ -20,10 +20,18 @@ const getApiUrl = () => {
     return envUrl;
   }
 
-  // Fallback
-  const port = 6868;
-  const url = `http://${hostname}:${port}/api/v1`;
-  console.log('🌐 API URL (Fallback):', url);
+  // Fallback: same origin (backend served on same domain via Vercel functions)
+  // For local dev with port, check if running on localhost
+  if (hostname === 'localhost' || hostname === '127.0.0.1') {
+    const url = `http://${hostname}:6868/api/v1`;
+    console.log('🌐 API URL (Local Fallback):', url);
+    return url;
+  }
+
+  // Production: API is served on the same domain
+  const protocol = window.location.protocol;
+  const url = `${protocol}//${hostname}/api/v1`;
+  console.log('🌐 API URL (Same-Origin Fallback):', url);
   return url;
 };
 
