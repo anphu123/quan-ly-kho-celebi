@@ -1,6 +1,14 @@
 module.exports = (options, webpack) => {
   return {
     ...options,
+    entry: {
+      main: './src/main.ts',
+      serverless: './src/serverless.ts',
+    },
+    output: {
+      ...options.output,
+      filename: '[name].js',
+    },
     module: {
       rules: [
         {
