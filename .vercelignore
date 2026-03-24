@@ -10,3 +10,6 @@ coverage
 apps/backend/dist
 apps/backend/uploads
 apps/web/dist
+apps/web/.vite
+apps/web/node_modules/.vite
+quan-ly-kho-celebi

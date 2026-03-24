@@ -1,7 +1,8 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import { clearStoredAuth, persistTokens } from '../lib/auth-storage';
 
-interface User {
+export interface User {
   id: string;
   email: string;
   fullName: string;
@@ -10,8 +11,8 @@ interface User {
 
 interface AuthState {
   user: User | null;
-  accessToken: string | null;
-  refreshToken: string | null;
+  hasHydrated: boolean;
+  markHydrated: () => void;
   setAuth: (user: User, accessToken: string, refreshToken: string) => void;
   logout: () => void;
 }
@@ -20,21 +21,23 @@ export const useAuthStore = create<AuthState>()(
   persist(
     (set) => ({
       user: null,
-      accessToken: null,
-      refreshToken: null,
+      hasHydrated: false,
+      markHydrated: () => set({ hasHydrated: true }),
       setAuth: (user, accessToken, refreshToken) => {
-        localStorage.setItem('accessToken', accessToken);
-        localStorage.setItem('refreshToken', refreshToken);
-        set({ user, accessToken, refreshToken });
+        persistTokens(accessToken, refreshToken);
+        set({ user });
       },
       logout: () => {
-        localStorage.removeItem('accessToken');
-        localStorage.removeItem('refreshToken');
-        set({ user: null, accessToken: null, refreshToken: null });
+        clearStoredAuth();
+        set({ user: null });
       },
     }),
     {
       name: 'auth-storage',
+      partialize: (state) => ({ user: state.user }),
+      onRehydrateStorage: () => (state) => {
+        state?.markHydrated();
+      },
     }
   )
 );

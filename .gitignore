@@ -27,7 +27,10 @@ apps/backend/prisma/migrations/*.sql
 
 # Build artifacts
 apps/web/dist/
+apps/web/.vite/
+apps/web/node_modules/.vite/
 apps/backend/dist/
+apps/backend/uploads/
 
 # Coverage
 coverage/

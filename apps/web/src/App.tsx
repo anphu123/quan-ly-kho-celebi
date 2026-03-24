@@ -1,6 +1,7 @@
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { Suspense, lazy } from 'react';
 import { useAuthStore } from './stores/auth.store';
+import { getAccessToken } from './lib/auth-storage';
 
 // Layouts
 import MainLayout from './layouts/MainLayout';
@@ -38,13 +39,23 @@ const ProductTemplatesPage = lazy(() => import('./pages/products/ProductTemplate
 
 // --- Route Guards ---
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
-  const { user } = useAuthStore();
-  // Trong thực tế, nên kiểm tra thêm token expire tại đây
-  return user ? <>{children}</> : <Navigate to="/login" replace />;
+  const { user, hasHydrated } = useAuthStore();
+  const hasToken = typeof window !== 'undefined' && Boolean(getAccessToken());
+
+  if (!hasHydrated) {
+    return <PageLoader />;
+  }
+
+  return user && hasToken ? <>{children}</> : <Navigate to="/login" replace />;
 }
 
 function SuperAdminRoute({ children }: { children: React.ReactNode }) {
-  const { user } = useAuthStore();
+  const { user, hasHydrated } = useAuthStore();
+
+  if (!hasHydrated) {
+    return <PageLoader />;
+  }
+
   return user?.role === 'SUPER_ADMIN' ? <>{children}</> : <Navigate to="/dashboard" replace />;
 }
 
@@ -119,7 +130,7 @@ function App() {
             <Route path="create" element={<CreateTradeInPage />} />
             <Route path="create-single" element={<CreateSingleTradeInPage />} />
             {/* <Route path=":id" element={<TradeInDetailPage />} /> */}
-            <Route path="/trade-in-xiaomi/:id" element={<TradeInDetailPage />} />
+            <Route path=":id" element={<TradeInDetailPage />} />
           </Route>
 
           {/* Admin Restricted */}

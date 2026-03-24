@@ -1,11 +1,10 @@
 import { NestFactory } from '@nestjs/core';
-import { ValidationPipe } from '@nestjs/common';
-import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { ConfigService } from '@nestjs/config';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import { join } from 'path';
 import { readFileSync, existsSync } from 'fs';
 import { AppModule } from './app.module';
+import { configureCommonApp, setupSwagger } from './bootstrap/common-app';
 
 const loadEnvFile = (filePath: string) => {
   if (!existsSync(filePath)) return;
@@ -53,10 +52,6 @@ async function bootstrap() {
   app.use(require('express').json({ limit: '50mb' }));
   app.use(require('express').urlencoded({ limit: '50mb', extended: true }));
 
-  // Serve uploaded files as static assets
-  const uploadDir = join(process.cwd(), 'uploads');
-  app.useStaticAssets(uploadDir, { prefix: '/uploads' });
-
   const configService = app.get(ConfigService);
 
   if (!httpsOptions) {
@@ -67,52 +62,8 @@ async function bootstrap() {
     }
   }
 
-  // Global prefix
-  app.setGlobalPrefix('api/v1');
-
-  // CORS
-  const corsOriginsStr = configService.get('CORS_ORIGINS', '*');
-  let corsOrigin: boolean | string | string[] = true; // true reflects the exact request origin which fixes the wildcard + credentials issue
-
-  if (corsOriginsStr !== '*') {
-    corsOrigin = corsOriginsStr.split(',').map(o => o.trim());
-  }
-
-  app.enableCors({
-    origin: corsOrigin,
-    credentials: true,
-  });
-
-  // Global validation pipe
-  app.useGlobalPipes(
-    new ValidationPipe({
-      whitelist: true,
-      forbidNonWhitelisted: true,
-      transform: true,
-      transformOptions: {
-        enableImplicitConversion: true,
-      },
-    })
-  );
-
-  // Swagger documentation
-  const config = new DocumentBuilder()
-    .setTitle('CELEBI Inventory & POS API')
-    .setDescription('API Documentation for CELEBI Inventory Management System')
-    .setVersion('1.0')
-    .addBearerAuth()
-    .addTag('auth', 'Authentication & Authorization')
-    .addTag('users', 'User Management')
-    .addTag('products', 'Product Catalog')
-    .addTag('inventory', 'Inventory Operations')
-    .addTag('sales', 'Sales & POS')
-    .addTag('purchasing', 'Purchasing & Goods Receipt')
-    .addTag('finance', 'Finance & Accounting')
-    .addTag('reports', 'Reports & Dashboard')
-    .build();
-
-  const document = SwaggerModule.createDocument(app, config);
-  SwaggerModule.setup('api', app, document);
+  configureCommonApp(app, configService);
+  setupSwagger(app);
 
   // Render.com provides PORT, fallback to APP_PORT, then default
   const port = configService.get('PORT') || configService.get('APP_PORT', 6868);

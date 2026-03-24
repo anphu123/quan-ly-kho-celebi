@@ -1,4 +1,6 @@
 import axios from 'axios';
+import { getAccessToken, getRefreshToken, persistTokens } from './auth-storage';
+import { useAuthStore } from '../stores/auth.store';
 
 // Auto-detect API URL based on current host for LAN access
 const getApiUrl = () => {
@@ -47,7 +49,7 @@ export const api = axios.create({
 
 // Request interceptor - attach token
 api.interceptors.request.use((config) => {
-  const token = localStorage.getItem('accessToken');
+  const token = getAccessToken();
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }
@@ -64,18 +66,20 @@ api.interceptors.response.use(
       originalRequest._retry = true;
 
       try {
-        const refreshToken = localStorage.getItem('refreshToken');
+        const refreshToken = getRefreshToken();
         const { data } = await axios.post(`${API_URL}/auth/refresh`, {
           refreshToken,
         });
 
-        localStorage.setItem('accessToken', data.accessToken);
+        const nextRefreshToken = data.refreshToken ?? refreshToken;
+        if (nextRefreshToken) {
+          persistTokens(data.accessToken, nextRefreshToken);
+        }
         originalRequest.headers.Authorization = `Bearer ${data.accessToken}`;
 
         return api(originalRequest);
       } catch (refreshError) {
-        localStorage.removeItem('accessToken');
-        localStorage.removeItem('refreshToken');
+        useAuthStore.getState().logout();
         window.location.href = '/login';
         return Promise.reject(refreshError);
       }

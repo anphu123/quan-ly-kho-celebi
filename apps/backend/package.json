@@ -3,8 +3,9 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
+    "prebuild": "pnpm prisma:generate",
     "build": "nest build",
-    "build-production": "pnpm exec prisma generate && pnpm exec nest build",
+    "build-production": "pnpm build",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
     "start": "nest start",
     "dev": "nest start --watch",

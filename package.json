@@ -10,16 +10,17 @@
     "packages/*"
   ],
   "scripts": {
+    "postinstall": "pnpm --filter @celebi/backend prisma:generate",
     "dev": "turbo run dev",
-    "build": "turbo run build",
-    "lint": "turbo run lint",
-    "test": "turbo run test",
-    "clean": "turbo run clean && rm -rf node_modules",
+    "build": "pnpm -C apps/backend build && pnpm -C apps/web build",
+    "lint": "pnpm -r --if-present lint",
+    "test": "pnpm -r --if-present test",
+    "clean": "pnpm -r --if-present clean && rm -rf node_modules .turbo apps/backend/dist apps/web/dist apps/web/.vite",
     "format": "prettier --write \"**/*.{ts,tsx,md,json}\"",
     "db:migrate": "cd apps/backend && pnpm prisma migrate dev",
     "db:studio": "cd apps/backend && pnpm prisma studio",
     "db:seed": "cd apps/backend && pnpm prisma db seed",
-    "build:vercel": "(cd apps/web && pnpm build) && (cd apps/backend && pnpm run build-production)"
+    "build:vercel": "pnpm build"
   },
   "devDependencies": {
     "@types/node": "^20.11.17",

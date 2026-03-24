@@ -1,8 +1,9 @@
 import { NestFactory } from '@nestjs/core';
 import { ExpressAdapter } from '@nestjs/platform-express';
-import { ValidationPipe } from '@nestjs/common';
 import type { Express } from 'express';
 import { AppModule } from './app.module';
+import { ConfigService } from '@nestjs/config';
+import { configureCommonApp } from './bootstrap/common-app';
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const expressApp: Express = require('express')();
@@ -15,22 +16,8 @@ export async function createServerlessHandler(): Promise<Express> {
     logger: ['error', 'warn'],
   });
 
-  nestApp.setGlobalPrefix('api/v1');
-
-  const corsOriginsStr = process.env.CORS_ORIGINS || '*';
-  nestApp.enableCors({
-    origin: corsOriginsStr === '*' ? true : corsOriginsStr.split(',').map((o) => o.trim()),
-    credentials: true,
-  });
-
-  nestApp.useGlobalPipes(
-    new ValidationPipe({
-      whitelist: true,
-      forbidNonWhitelisted: true,
-      transform: true,
-      transformOptions: { enableImplicitConversion: true },
-    }),
-  );
+  const configService = nestApp.get(ConfigService);
+  configureCommonApp(nestApp, configService);
 
   await nestApp.init();
   cachedApp = expressApp;
