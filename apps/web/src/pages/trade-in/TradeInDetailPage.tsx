@@ -372,11 +372,7 @@ export default function TradeInDetailPage() {
 
     const handleSave = () => {
         if (confirm('Xác nhận cập nhật thông tin?')) {
-            const payload = { ...editForm };
-            if (typeof payload.deviceImages === 'string') {
-                try { payload.deviceImages = JSON.parse(payload.deviceImages as string); } catch { payload.deviceImages = []; }
-            }
-            updateMutation.mutate(payload);
+            updateMutation.mutate(editForm);
         }
     };
 
@@ -430,9 +426,6 @@ export default function TradeInDetailPage() {
 
         const requiredNumberFields: Array<{ key: string; label: string }> = [
             { key: 'estimatedValue', label: 'Giá thu mua' },
-            { key: 'otherCosts', label: 'Chi phí khác' },
-            { key: 'topUp', label: 'Top Up' },
-            { key: 'repairCost', label: 'Giá sửa chữa khuyên dùng' },
         ];
 
         requiredTextFields.forEach(({ key, label }) => {

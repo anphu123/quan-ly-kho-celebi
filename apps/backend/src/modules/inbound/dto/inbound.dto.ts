@@ -453,6 +453,11 @@ export class CompleteInboundDto {
   @IsOptional()
   @IsString()
   notes?: string;
+
+  @ApiPropertyOptional({ description: 'Skip QC and set items directly to AVAILABLE (for trade-in)' })
+  @IsOptional()
+  @IsBoolean()
+  skipQC?: boolean;
 }
 
 // ===========================  

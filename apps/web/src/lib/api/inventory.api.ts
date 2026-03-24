@@ -156,6 +156,12 @@ export const inventoryApi = {
     return data.data;
   },
 
+  // Get single serial item with full details
+  getById: async (id: string) => {
+    const { data } = await api.get(`/serial-items/${id}`);
+    return data;
+  },
+
   // Update serial item status (replaces adjustStock)
   adjustStock: async (dto: StockAdjustmentDto) => {
     const { data } = await api.put(`/serial-items/${dto.serialItemId}/status`, {

@@ -309,11 +309,14 @@ export class InboundService {
       throw new BadRequestException('Cannot update items of completed inbound request');
     }
 
+    const { isReceived, idCardIssueDate, purchaseDate, ...rest } = dto;
     return this.prisma.inboundItem.update({
       where: { id: itemId },
       data: {
-        ...dto,
-        receivedAt: dto.isReceived ? new Date() : item.receivedAt,
+        ...rest,
+        ...(idCardIssueDate !== undefined && { idCardIssueDate: new Date(idCardIssueDate) }),
+        ...(purchaseDate !== undefined && { purchaseDate: new Date(purchaseDate) }),
+        receivedAt: isReceived ? new Date() : item.receivedAt,
       },
       include: {
         category: true,
@@ -470,6 +473,7 @@ export class InboundService {
         }
 
         // Create SerialItem with proper error handling
+        const initialStatus = dto.skipQC ? SerialStatus.AVAILABLE : SerialStatus.INCOMING;
         try {
           const serialItem = await tx.serialItem.create({
             data: {
@@ -480,7 +484,7 @@ export class InboundService {
               purchasePrice: Number(receiveItem.purchasePrice),
               purchaseDate: new Date(),
               purchaseBatch: request.code,
-              status: SerialStatus.INCOMING,
+              status: initialStatus,
               conditionNotes: receiveItem.condition || inboundItem.condition,
               currentCostPrice: Number(receiveItem.purchasePrice),
               warehouseId: request.warehouseId,
@@ -520,7 +524,7 @@ export class InboundService {
               serialItemId: serialItem.id,
               type: TransactionType.INBOUND,
               fromStatus: null,
-              toStatus: SerialStatus.INCOMING,
+              toStatus: initialStatus,
               fromLocation: null,
               toLocation: receiveItem.binLocation,
               costChange: Number(receiveItem.purchasePrice),
@@ -533,7 +537,7 @@ export class InboundService {
           await this.stockService.updateStockLevelOnStatusChange(
             serialItem.id,
             null, // oldStatus = null (mới tạo)
-            SerialStatus.INCOMING,
+            initialStatus,
             userId,
             'INBOUND',
             request.id,

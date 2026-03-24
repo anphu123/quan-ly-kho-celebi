@@ -292,46 +292,82 @@ export class StockService {
   // ===========================
 
   /**
+   * Tính live stock levels từ SerialItem (source of truth)
+   */
+  private async computeLiveStockLevels(warehouseId?: string) {
+    const items = await this.prisma.serialItem.findMany({
+      where: {
+        ...(warehouseId ? { warehouseId } : {}),
+        status: { notIn: [SerialStatus.SOLD, SerialStatus.DISPOSED] },
+      },
+      include: {
+        productTemplate: { include: { category: true, brand: true } },
+        warehouse: true,
+      },
+    });
+
+    // Load reorderPoints từ StockLevel table (chỉ để giữ cài đặt min/max)
+    const stockLevelSettings = await this.prisma.stockLevel.findMany({
+      where: warehouseId ? { warehouseId } : {},
+      select: { productTemplateId: true, warehouseId: true, reorderPoint: true, minStockLevel: true, maxStockLevel: true },
+    });
+    const settingsMap = new Map(
+      stockLevelSettings.map(s => [`${s.productTemplateId}_${s.warehouseId}`, s])
+    );
+
+    const groups = new Map<string, any>();
+    for (const item of items) {
+      const key = `${item.productTemplateId}_${item.warehouseId}`;
+      if (!groups.has(key)) {
+        const settings = settingsMap.get(key);
+        groups.set(key, {
+          id: key,
+          productTemplateId: item.productTemplateId,
+          warehouseId: item.warehouseId,
+          productTemplate: item.productTemplate,
+          warehouse: item.warehouse,
+          grade: null,
+          physicalQty: 0,
+          incomingQty: 0,
+          qcInProgressQty: 0,
+          availableQty: 0,
+          reservedQty: 0,
+          refurbishingQty: 0,
+          damagedQty: 0,
+          returnedQty: 0,
+          totalValue: 0,
+          averageCost: 0,
+          reorderPoint: settings?.reorderPoint ?? 0,
+          minStockLevel: settings?.minStockLevel ?? 0,
+          maxStockLevel: settings?.maxStockLevel ?? null,
+        });
+      }
+      const g = groups.get(key);
+      g.physicalQty++;
+      g.totalValue += Number(item.currentCostPrice) || 0;
+      const field = this.getStatusField(item.status);
+      if (field && field in g) g[field]++;
+    }
+
+    const result = Array.from(groups.values());
+    result.forEach(g => {
+      g.averageCost = g.physicalQty > 0 ? g.totalValue / g.physicalQty : 0;
+    });
+    return result.sort((a, b) => b.availableQty - a.availableQty);
+  }
+
+  /**
    * Lấy tất cả tồn kho
    */
   async getAllStockLevels() {
-    return this.prisma.stockLevel.findMany({
-      include: {
-        productTemplate: {
-          include: {
-            category: true,
-            brand: true,
-          },
-        },
-        warehouse: true,
-      },
-      orderBy: [
-        { availableQty: 'desc' },
-        { productTemplate: { name: 'asc' } },
-      ],
-    });
+    return this.computeLiveStockLevels();
   }
 
   /**
    * Lấy tồn kho theo warehouse
    */
   async getStockLevelsByWarehouse(warehouseId: string) {
-    return this.prisma.stockLevel.findMany({
-      where: { warehouseId },
-      include: {
-        productTemplate: {
-          include: {
-            category: true,
-            brand: true,
-          },
-        },
-        warehouse: true,
-      },
-      orderBy: [
-        { availableQty: 'desc' },
-        { productTemplate: { name: 'asc' } },
-      ],
-    });
+    return this.computeLiveStockLevels(warehouseId);
   }
 
   /**
@@ -356,27 +392,10 @@ export class StockService {
    * Lấy sản phẩm sắp hết hàng
    */
   async getLowStockProducts(warehouseId?: string) {
-    const where: any = {
-      availableQty: { lte: this.prisma.stockLevel.fields.reorderPoint },
-    };
-
-    if (warehouseId) {
-      where.warehouseId = warehouseId;
-    }
-
-    return this.prisma.stockLevel.findMany({
-      where,
-      include: {
-        productTemplate: {
-          include: {
-            category: true,
-            brand: true,
-          },
-        },
-        warehouse: true,
-      },
-      orderBy: { availableQty: 'asc' },
-    });
+    const levels = await this.computeLiveStockLevels(warehouseId);
+    return levels
+      .filter(l => l.availableQty <= l.reorderPoint)
+      .sort((a, b) => a.availableQty - b.availableQty);
   }
 
   /**

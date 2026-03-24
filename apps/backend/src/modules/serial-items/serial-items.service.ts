@@ -266,7 +266,23 @@ export class SerialItemsService {
       throw new NotFoundException(`Serial item with ID "${id}" not found`);
     }
 
-    return item;
+    // Fetch linked inbound item (images, customer info)
+    const inboundItem = await this.prisma.inboundItem.findFirst({
+      where: { serialItemId: id },
+      select: {
+        id: true,
+        imageUrl: true,
+        deviceImages: true,
+        cccdFrontUrl: true,
+        cccdBackUrl: true,
+        sourceCustomerName: true,
+        sourceCustomerPhone: true,
+        modelName: true,
+        notes: true,
+      },
+    });
+
+    return { ...item, inboundItem: inboundItem ?? null };
   }
 
   async create(createDto: CreateSerialItemDto, userId: string) {

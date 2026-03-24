@@ -176,6 +176,7 @@ export class InboundController {
       inboundRequestId: id,
       items,
       notes: body?.notes,
+      skipQC: true,
     };
     
     return this.inboundService.completeInboundRequest(dto, user.id);

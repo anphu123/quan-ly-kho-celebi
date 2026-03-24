@@ -21,6 +21,7 @@ const InboundPage = lazy(() => import('./pages/inbound/InboundPage'));
 const CreateInboundPage = lazy(() => import('./pages/inbound/CreateInboundPage'));
 const InboundDetailPage = lazy(() => import('./pages/inbound/InboundDetailPage'));
 const LabelPrinterPage = lazy(() => import('./pages/inventory/LabelPrinterPage'));
+const InventoryItemDetailPage = lazy(() => import('./pages/inventory/InventoryItemDetailPage'));
 const POSPage = lazy(() => import('./pages/pos/POSPage'));
 const OutboundPage = lazy(() => import('./pages/outbound/OutboundPage'));
 const CreateOutboundPage = lazy(() => import('./pages/outbound/CreateOutboundPage'));
@@ -101,6 +102,7 @@ function App() {
           </Route>
 
           <Route path="inventory/print-label" element={<LabelPrinterPage />} />
+          <Route path="inventory/:id" element={<InventoryItemDetailPage />} />
 
           <Route path="stock/levels" element={<StockLevelsPage />} />
 

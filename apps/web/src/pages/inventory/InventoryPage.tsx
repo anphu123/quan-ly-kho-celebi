@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   Package, Search, Loader2, AlertTriangle,
@@ -38,6 +39,7 @@ const STATUS_COLORS: Record<SerialStatus, string> = {
 
 export default function InventoryPage() {
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<SerialStatus | ''>('');
   const [adjustModal, setAdjustModal] = useState<SerialItem | null>(null);
@@ -187,7 +189,7 @@ export default function InventoryPage() {
                   </td>
                 </tr>
               ) : filteredItems.map((item) => (
-                <tr key={item.id}>
+                <tr key={item.id} onClick={() => navigate(`/inventory/${item.id}`)} style={{ cursor: 'pointer' }}>
                   <td>
                     <span style={{ fontWeight: 700, color: '#0f172a', display: 'block' }}>
                       {item.productTemplate?.name}
@@ -235,7 +237,7 @@ export default function InventoryPage() {
                     <button
                       className="tbl-action-btn"
                       style={{ marginLeft: 'auto', width: 'auto', padding: '0.5rem 0.875rem', gap: '0.375rem', borderRadius: '0.75rem', fontSize: '0.75rem', fontWeight: 700 }}
-                      onClick={() => setAdjustModal(item)}
+                      onClick={(e) => { e.stopPropagation(); setAdjustModal(item); }}
                     >
                       <ArrowUpDown size={14} /> Cập nhật
                     </button>
