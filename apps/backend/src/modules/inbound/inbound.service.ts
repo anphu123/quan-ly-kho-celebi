@@ -7,7 +7,7 @@ import {
   InboundQueryDto,
   UpdateInboundItemDto
 } from './dto/inbound.dto';
-import { InboundStatus, SerialStatus, TransactionType } from '@prisma/client';
+import { InboundStatus, SerialStatus, SupplierType, TransactionType } from '@prisma/client';
 import { StockService } from '../stock/stock.service';
 
 @Injectable()
@@ -406,6 +406,10 @@ export class InboundService {
         throw new BadRequestException('Inbound request must be in IN_PROGRESS status');
       }
 
+      if (request.supplierType === SupplierType.CUSTOMER_TRADE_IN) {
+        this.ensureTradeInRequestIsComplete(request.items);
+      }
+
       // Validate items exist and not already received
       const itemsToProcess = new Map();
       for (const receiveItem of dto.items) {
@@ -638,6 +642,89 @@ export class InboundService {
     }
 
     return `INB-${year}${month}-${String(sequence).padStart(3, '0')}`;
+  }
+
+  private ensureTradeInRequestIsComplete(items: Array<Record<string, any>>) {
+    const validationErrors = items
+      .map((item, index) => {
+        const missing = this.getMissingTradeInFields(item);
+        if (missing.length === 0) return null;
+
+        const itemLabel = item.modelName?.trim() || item.serialNumber?.trim() || `item #${index + 1}`;
+        return `${itemLabel}: ${missing.join(', ')}`;
+      })
+      .filter(Boolean);
+
+    if (validationErrors.length > 0) {
+      throw new BadRequestException(
+        `Trade-in must have all required fields before stock-in: ${validationErrors.join(' | ')}`,
+      );
+    }
+  }
+
+  private getMissingTradeInFields(item: Record<string, any>): string[] {
+    const missing: string[] = [];
+    const requiredTextFields: Array<[keyof typeof item, string]> = [
+      ['modelName', 'Thiết bị'],
+      ['serialNumber', 'IMEI / Serial'],
+      ['notes', 'Ghi chú tình trạng'],
+      ['sourceCustomerName', 'Tên khách hàng'],
+      ['sourceCustomerPhone', 'Số điện thoại'],
+      ['sourceCustomerAddress', 'Địa chỉ'],
+      ['sourceCustomerIdCard', 'Số CCCD'],
+      ['idCardIssueDate', 'Ngày cấp CCCD'],
+      ['idCardIssuePlace', 'Nơi cấp CCCD'],
+      ['bankAccount', 'Số tài khoản'],
+      ['bankName', 'Ngân hàng'],
+      ['contractNumber', 'Số hợp đồng'],
+      ['purchaseDate', 'Ngày mua'],
+      ['employeeName', 'Nhân viên'],
+    ];
+    const requiredNumberFields: Array<[keyof typeof item, string]> = [
+      ['estimatedValue', 'Giá thu mua'],
+      ['otherCosts', 'Chi phí khác'],
+      ['topUp', 'Top Up'],
+      ['repairCost', 'Giá sửa chữa khuyên dùng'],
+    ];
+
+    requiredTextFields.forEach(([key, label]) => {
+      const value = item[key];
+      if (value == null || String(value).trim() === '') {
+        missing.push(label);
+      }
+    });
+
+    requiredNumberFields.forEach(([key, label]) => {
+      const value = item[key];
+      if (value == null || Number.isNaN(Number(value))) {
+        missing.push(label);
+      }
+    });
+
+    const primaryImage = item.imageUrl != null && String(item.imageUrl).trim() !== '';
+    let extraImagesCount = 0;
+    if (typeof item.deviceImages === 'string' && item.deviceImages.trim() !== '') {
+      try {
+        const parsed = JSON.parse(item.deviceImages);
+        if (Array.isArray(parsed)) {
+          extraImagesCount = parsed.filter(Boolean).length;
+        }
+      } catch {
+        extraImagesCount = 0;
+      }
+    }
+
+    if (!primaryImage && extraImagesCount === 0) {
+      missing.push('Ảnh thiết bị');
+    }
+    if (item.cccdFrontUrl == null || String(item.cccdFrontUrl).trim() === '') {
+      missing.push('CCCD mặt trước');
+    }
+    if (item.cccdBackUrl == null || String(item.cccdBackUrl).trim() === '') {
+      missing.push('CCCD mặt sau');
+    }
+
+    return missing;
   }
 
   private async generateInternalCode(tx: any): Promise<string> {
