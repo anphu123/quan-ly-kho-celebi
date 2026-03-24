@@ -8,6 +8,9 @@ module.exports = (options, webpack) => {
     output: {
       ...options.output,
       filename: '[name].js',
+      library: {
+        type: 'commonjs2',
+      },
     },
     module: {
       rules: [
