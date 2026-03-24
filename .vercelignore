@@ -7,7 +7,6 @@ node_modules
 coverage
 .vscode
 .idea
-apps/backend/dist
 apps/backend/uploads
 apps/web/dist
 apps/web/.vite
