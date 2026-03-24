@@ -372,7 +372,11 @@ export default function TradeInDetailPage() {
 
     const handleSave = () => {
         if (confirm('Xác nhận cập nhật thông tin?')) {
-            updateMutation.mutate(editForm);
+            const payload = { ...editForm };
+            if (typeof payload.deviceImages === 'string') {
+                try { payload.deviceImages = JSON.parse(payload.deviceImages as string); } catch { payload.deviceImages = []; }
+            }
+            updateMutation.mutate(payload);
         }
     };
 
