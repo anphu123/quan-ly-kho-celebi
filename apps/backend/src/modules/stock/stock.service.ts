@@ -81,10 +81,14 @@ export class StockService {
       where: { id: serialItemId },
       include: { 
         productTemplate: true,
-        inboundItem: {
+        inboundItems: {
           include: {
             inboundRequest: true,
           },
+          orderBy: {
+            createdAt: 'desc',
+          },
+          take: 1,
         },
       },
     });
@@ -142,7 +146,7 @@ export class StockService {
       // Tạo StockMovement nếu IN/OUT kho vật lý
       if (!isOldInStock && isNewInStock) {
         // IN movement
-        const inboundRequest = serialItem.inboundItem?.inboundRequest;
+        const inboundRequest = serialItem.inboundItems[0]?.inboundRequest;
         const supplierInfo = inboundRequest 
           ? `${inboundRequest.supplierType} - ${inboundRequest.supplierName}`
           : serialItem.source || 'Unknown source';

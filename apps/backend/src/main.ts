@@ -6,6 +6,7 @@ import { readFileSync, existsSync } from 'fs';
 import { AppModule } from './app.module';
 import { configureCommonApp, setupSwagger } from './bootstrap/common-app';
 import { normalizeDatabaseEnv } from './config/runtime-env';
+import { ensureMongoIndexes } from './config/mongo-indexes';
 
 const loadEnvFile = (filePath: string) => {
   if (!existsSync(filePath)) return;
@@ -34,6 +35,7 @@ async function bootstrap() {
   const envPath = process.env.ENV_PATH || join(process.cwd(), '.env');
   loadEnvFile(envPath);
   normalizeDatabaseEnv();
+  await ensureMongoIndexes(process.env.MONGODB_URI || process.env.DATABASE_URL || '');
 
   const httpsKeyPath = process.env.HTTPS_KEY_PATH;
   const httpsCertPath = process.env.HTTPS_CERT_PATH;

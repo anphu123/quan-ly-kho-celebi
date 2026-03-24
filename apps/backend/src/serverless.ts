@@ -5,6 +5,7 @@ import { AppModule } from './app.module';
 import { ConfigService } from '@nestjs/config';
 import { configureCommonApp } from './bootstrap/common-app';
 import { normalizeDatabaseEnv } from './config/runtime-env';
+import { ensureMongoIndexes } from './config/mongo-indexes';
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const expressApp: Express = require('express')();
@@ -13,6 +14,7 @@ let cachedApp: Express | null = null;
 export async function createServerlessHandler(): Promise<Express> {
   if (cachedApp) return cachedApp;
   normalizeDatabaseEnv();
+  await ensureMongoIndexes(process.env.MONGODB_URI || process.env.DATABASE_URL || '');
 
   const nestApp = await NestFactory.create(AppModule, new ExpressAdapter(expressApp), {
     logger: ['error', 'warn'],
