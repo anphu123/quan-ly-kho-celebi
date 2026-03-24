@@ -1,24 +1,26 @@
+import { getMongoConnectionUri } from './runtime-env';
+
 /**
  * MongoDB connection config
  * Priority: Cloud (Atlas) → Local (backup)
  */
 export const mongoConfig = {
   /**
-   * Trả về URI theo thứ tự ưu tiên:
-   * 1. MONGODB_URI (cloud Atlas)
+  * Trả về URI theo thứ tự ưu tiên:
+   * 1. MONGODB_URI / DATABASE_URL
    * 2. MONGODB_LOCAL_URI (local backup)
    */
   getUri(): string {
-    const cloud = process.env.MONGODB_URI;
-    const local = process.env.MONGODB_LOCAL_URI || 'mongodb://localhost:27017/celebi_db';
+    const uri = getMongoConnectionUri();
+    const isLocal = uri.includes('localhost') || uri.includes('127.0.0.1');
 
-    if (cloud) {
-      console.log('[MongoDB] Using cloud (Atlas)');
-      return cloud;
+    if (isLocal) {
+      console.warn('[MongoDB] Cloud URI not set — falling back to local');
+    } else {
+      console.log('[MongoDB] Using configured MongoDB URI');
     }
 
-    console.warn('[MongoDB] Cloud URI not set — falling back to local');
-    return local;
+    return uri;
   },
 
   options: {

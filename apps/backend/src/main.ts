@@ -5,6 +5,7 @@ import { join } from 'path';
 import { readFileSync, existsSync } from 'fs';
 import { AppModule } from './app.module';
 import { configureCommonApp, setupSwagger } from './bootstrap/common-app';
+import { normalizeDatabaseEnv } from './config/runtime-env';
 
 const loadEnvFile = (filePath: string) => {
   if (!existsSync(filePath)) return;
@@ -32,6 +33,7 @@ const loadEnvFile = (filePath: string) => {
 async function bootstrap() {
   const envPath = process.env.ENV_PATH || join(process.cwd(), '.env');
   loadEnvFile(envPath);
+  normalizeDatabaseEnv();
 
   const httpsKeyPath = process.env.HTTPS_KEY_PATH;
   const httpsCertPath = process.env.HTTPS_CERT_PATH;
