@@ -50,6 +50,37 @@ const InfoRow = ({ label, value, highlight = false }: { label: string; value: st
     </div>
 );
 
+type EditFormCtx = { isEditing: boolean; editForm: Record<string, unknown>; setEditForm: (f: Record<string, unknown>) => void };
+const EditFormContext = React.createContext<EditFormCtx>({ isEditing: false, editForm: {}, setEditForm: () => {} });
+
+const EditableInfoRow = ({ label, fieldName, value, type = 'text', highlight = false }: {
+    label: string;
+    fieldName: string;
+    value: any;
+    type?: 'text' | 'number' | 'date';
+    highlight?: boolean;
+}) => {
+    const { isEditing, editForm, setEditForm } = React.useContext(EditFormContext);
+    if (!isEditing) {
+        return <InfoRow label={label} value={type === 'number' ? fmt(value) : (type === 'date' ? fmtDate(value) : value)} highlight={highlight} />;
+    }
+    return (
+        <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px dashed #f1f5f9', alignItems: 'center' }}>
+            <span style={{ color: '#64748b', fontSize: 13 }}>{label}</span>
+            <input
+                type={type}
+                value={editForm[fieldName] as string | number || ''}
+                onChange={(e) => setEditForm({ ...editForm, [fieldName]: type === 'number' ? Number(e.target.value) : e.target.value })}
+                style={{
+                    padding: '6px 10px', fontSize: 13, borderRadius: 6,
+                    border: '1px solid #e2e8f0', maxWidth: '60%',
+                    background: '#fff', color: '#0f172a'
+                }}
+            />
+        </div>
+    );
+};
+
 const ImgPreview = ({ url, label, onZoom }: { url: string; label: string; onZoom: (url: string, title: string) => void }) => {
     const resolvedUrl = resolveImageUrl(url);
     return (
@@ -350,33 +381,6 @@ export default function TradeInDetailPage() {
         setEditForm({});
     };
 
-    const EditableInfoRow = ({ label, fieldName, value, type = 'text', highlight = false }: {
-        label: string,
-        fieldName: string,
-        value: any,
-        type?: 'text' | 'number' | 'date',
-        highlight?: boolean
-    }) => {
-        if (!isEditing) {
-            return <InfoRow label={label} value={type === 'number' ? fmt(value) : (type === 'date' ? fmtDate(value) : value)} highlight={highlight} />;
-        }
-
-        return (
-            <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px dashed #f1f5f9', alignItems: 'center' }}>
-                <span style={{ color: '#64748b', fontSize: 13 }}>{label}</span>
-                <input
-                    type={type}
-                    value={(editForm as Record<string, unknown>)[fieldName] as string | number || ''}
-                    onChange={(e) => setEditForm({ ...editForm, [fieldName]: type === 'number' ? Number(e.target.value) : e.target.value })}
-                    style={{
-                        padding: '6px 10px', fontSize: 13, borderRadius: 6,
-                        border: '1px solid #e2e8f0', maxWidth: '60%',
-                        background: '#fff', color: '#0f172a'
-                    }}
-                />
-            </div>
-        );
-    };
 
     const handlePrint = () => {
         window.print();
@@ -804,6 +808,7 @@ export default function TradeInDetailPage() {
                 </div>
 
                 {/* Content - Row Layout */}
+                <EditFormContext.Provider value={{ isEditing, editForm: editForm as Record<string, unknown>, setEditForm: (f) => setEditForm(f as Partial<InboundItem>) }}>
                 <div style={{
                     display: 'flex', flexDirection: 'column', gap: 24,
                     ...(isEditing && {
@@ -1016,6 +1021,7 @@ export default function TradeInDetailPage() {
                     </Card>
 
                 </div>
+                </EditFormContext.Provider>
             </div>
 
             {/* Image Modal */}
