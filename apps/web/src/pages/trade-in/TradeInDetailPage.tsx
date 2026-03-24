@@ -287,6 +287,7 @@ export default function TradeInDetailPage() {
     };
 
     const handleUploadDeviceImages = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const input = e.currentTarget;
         const files = Array.from(e.target.files || []);
         if (files.length === 0) return;
         setIsUploadingDeviceImages(true);
@@ -302,11 +303,12 @@ export default function TradeInDetailPage() {
             alert(err?.message || 'Lỗi tải lên ảnh thiết bị');
         } finally {
             setIsUploadingDeviceImages(false);
-            e.target.value = '';
+            input.value = '';
         }
     };
 
     const handleUploadCccdFront = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const input = e.currentTarget;
         const file = e.target.files?.[0];
         if (!file) return;
         setIsUploadingCccdFront(true);
@@ -317,11 +319,12 @@ export default function TradeInDetailPage() {
             alert(err?.message || 'Lỗi tải lên CCCD mặt trước');
         } finally {
             setIsUploadingCccdFront(false);
-            e.target.value = '';
+            input.value = '';
         }
     };
 
     const handleUploadCccdBack = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const input = e.currentTarget;
         const file = e.target.files?.[0];
         if (!file) return;
         setIsUploadingCccdBack(true);
@@ -332,7 +335,7 @@ export default function TradeInDetailPage() {
             alert(err?.message || 'Lỗi tải lên CCCD mặt sau');
         } finally {
             setIsUploadingCccdBack(false);
-            e.target.value = '';
+            input.value = '';
         }
     };
 

@@ -1,7 +1,7 @@
 // Helpers for resolving image URLs from the backend
 const getBackendOrigin = () => {
   const envUrl = import.meta.env.VITE_API_URL;
-  const hostname = window.location.hostname;
+  const { hostname, protocol, origin } = window.location;
 
   if (envUrl && (envUrl.includes('localhost') || envUrl.includes('127.0.0.1'))) {
     if (hostname !== 'localhost' && hostname !== '127.0.0.1') {
@@ -13,8 +13,12 @@ const getBackendOrigin = () => {
     return envUrl.replace(/\/api\/v1\/?$/, '');
   }
 
-  const port = 6868;
-  return `http://${hostname}:${port}`;
+  if (hostname === 'localhost' || hostname === '127.0.0.1') {
+    const port = 6868;
+    return `${protocol}//${hostname}:${port}`;
+  }
+
+  return origin;
 };
 
 

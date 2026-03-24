@@ -238,6 +238,7 @@ export function BrandModal({ isOpen, onClose, onSubmit, initialData, loading }: 
                                     type="file"
                                     accept="image/*"
                                     onChange={async (e) => {
+                                        const input = e.currentTarget;
                                         const file = e.target.files?.[0];
                                         if (!file) return;
                                         setIsUploading(true);
@@ -248,7 +249,7 @@ export function BrandModal({ isOpen, onClose, onSubmit, initialData, loading }: 
                                             alert('Upload logo thất bại');
                                         } finally {
                                             setIsUploading(false);
-                                            e.currentTarget.value = '';
+                                            input.value = '';
                                         }
                                     }}
                                 />

@@ -98,6 +98,7 @@ function EditItemModal({ item, onClose }: { item: any; onClose: () => void }) {
     };
 
     const handleImageFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const input = e.currentTarget;
         const file = e.target.files?.[0];
         if (!file) return;
         setIsUploadingImage(true);
@@ -109,7 +110,7 @@ function EditItemModal({ item, onClose }: { item: any; onClose: () => void }) {
             alert(err?.message || 'Lỗi tải lên ảnh');
         } finally {
             setIsUploadingImage(false);
-            if (e.target) e.target.value = '';
+            input.value = '';
         }
     };
 

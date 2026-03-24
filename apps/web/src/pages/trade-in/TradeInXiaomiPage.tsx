@@ -100,6 +100,7 @@ function EditItemModal({ item, onClose }: { item: any; onClose: () => void }) {
     };
 
     const handleImageFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const input = e.currentTarget;
         const file = e.target.files?.[0];
         if (!file) return;
         setIsUploading(true);
@@ -111,7 +112,7 @@ function EditItemModal({ item, onClose }: { item: any; onClose: () => void }) {
             alert('Upload ảnh thất bại: ' + (err?.response?.data?.message || err?.message || 'Unknown error'));
         } finally {
             setIsUploading(false);
-            e.currentTarget.value = '';
+            input.value = '';
         }
     };
 
