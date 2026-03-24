@@ -128,7 +128,7 @@ export default function CategoriesPage() {
                 <th style={{ padding: '12px 24px', textAlign: 'left', fontSize: 13, fontWeight: 600, color: '#64748b' }}>Tên danh mục</th>
                 <th style={{ padding: '12px 24px', textAlign: 'left', fontSize: 13, fontWeight: 600, color: '#64748b' }}>Mã</th>
                 <th style={{ padding: '12px 24px', textAlign: 'left', fontSize: 13, fontWeight: 600, color: '#64748b' }}>Loại</th>
-                <th style={{ padding: '12px 24px', textAlign: 'left', fontSize: 13, fontWeight: 600, color: '#64748b' }}>Tracking</th>
+                <th style={{ padding: '12px 24px', textAlign: 'left', fontSize: 13, fontWeight: 600, color: '#64748b' }}>Theo dõi</th>
                 <th style={{ padding: '12px 24px', textAlign: 'right', fontSize: 13, fontWeight: 600, color: '#64748b' }}>Thao tác</th>
               </tr>
             </thead>
@@ -149,7 +149,7 @@ export default function CategoriesPage() {
                       background: category.trackingMethod === 'SERIAL_BASED' ? '#dbeafe' : '#fef3c7',
                       color: category.trackingMethod === 'SERIAL_BASED' ? '#1e40af' : '#92400e',
                     }}>
-                      {category.trackingMethod === 'SERIAL_BASED' ? 'Serial' : 'Số lượng'}
+                      {category.trackingMethod === 'SERIAL_BASED' ? 'Theo số serial' : 'Số lượng'}
                     </span>
                   </td>
                   <td style={{ padding: '16px 24px', textAlign: 'right' }}>

@@ -228,7 +228,7 @@ export default function StockLevelsPage() {
                 <tr>
                   <th style={{ minWidth: '280px' }}>Sản phẩm</th>
                   <th>Kho</th>
-                  <th>Grade</th>
+                  <th>Phân hạng</th>
                   <th className="text-right">Tồn vật lý</th>
                   <th className="text-right">Sẵn bán</th>
                   <th className="text-right">Đã đặt</th>

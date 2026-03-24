@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Plus, Edit2, Trash2, Package, Search } from 'lucide-react';
 import { productTemplatesApi, categoriesApi, brandsApi } from '../../api/masterdata.api';
+import { resolveImageUrl } from '../../lib/image';
 
 export default function ProductTemplatesPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -251,7 +252,7 @@ export default function ProductTemplatesPage() {
                         border: '1px solid #e2e8f0',
                       }}>
                         {product.image ? (
-                          <img src={product.image} alt={product.name} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 8 }} />
+                          <img src={resolveImageUrl(product.image)} alt={product.name} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 8 }} />
                         ) : (
                           <Package size={20} color="#cbd5e1" />
                         )}
@@ -466,7 +467,7 @@ export default function ProductTemplatesPage() {
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 20 }}>
                 <div>
                   <label style={{ display: 'block', marginBottom: 8, fontSize: 14, fontWeight: 600, color: '#475569' }}>
-                    Giá thu mua chuẩn (Grade A)
+                    Giá thu mua chuẩn (Hạng A)
                   </label>
                   <input
                     type="number"
@@ -485,7 +486,7 @@ export default function ProductTemplatesPage() {
 
                 <div>
                   <label style={{ display: 'block', marginBottom: 8, fontSize: 14, fontWeight: 600, color: '#475569' }}>
-                    Giá bán chuẩn (Grade A)
+                    Giá bán chuẩn (Hạng A)
                   </label>
                   <input
                     type="number"

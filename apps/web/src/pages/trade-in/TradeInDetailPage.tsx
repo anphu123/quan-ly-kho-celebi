@@ -8,6 +8,7 @@ import {
     Building2, FileText, Printer, Edit2, Save, XCircle
 } from 'lucide-react';
 import { inboundApi } from '../../api/inbound.api';
+import { resolveImageUrl } from '../../lib/image';
 
 // Format currency
 const fmt = (n?: number) => n != null ? n.toLocaleString('vi-VN') + ' đ' : '—';
@@ -44,6 +45,47 @@ export default function TradeInDetailPage() {
     });
 
     console.log('TradeInDetailPage:', { id, isLoading, isError, error, request, items: request?.items });
+
+    const receiveMutation = useMutation({
+        mutationFn: () => inboundApi.receiveItems(id!),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['trade-in-item', id] });
+            alert('Đã nhận hàng thành công. Chuyển sang trạng thái Đang chờ QC.');
+        },
+        onError: (err: any) => {
+            alert(err?.response?.data?.message || 'Lỗi khi nhận hàng');
+        }
+    });
+
+    const completeMutation = useMutation({
+        mutationFn: (notes?: string) => inboundApi.completeQC(id!, notes),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['trade-in-item', id] });
+            alert('Đã hoàn tất nhập kho thành công!');
+        },
+        onError: (err: any) => {
+            const errorMsg = err?.response?.data?.message || err?.message || 'Lỗi khi nhập kho';
+            console.error('Complete QC Error:', err);
+            alert('Lỗi nhập kho: ' + errorMsg);
+        }
+    });
+
+    const updateMutation = useMutation({
+        mutationFn: (data: any) => {
+            // Update the item-level data using the first item's ID
+            const itemId = request?.items?.[0]?.id;
+            if (!itemId) throw new Error('Item ID not found');
+            return inboundApi.updateItem(itemId, data);
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['trade-in-item', id] });
+            setIsEditing(false);
+            alert('Cập nhật thông tin thành công!');
+        },
+        onError: (err: any) => {
+            alert(err?.response?.data?.message || 'Lỗi khi cập nhật');
+        }
+    });
 
     if (isLoading) {
         return <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '100vh', color: '#64748b', fontSize: 16 }}>
@@ -90,15 +132,20 @@ export default function TradeInDetailPage() {
         serialItem,
     } = item as any;
 
+    const currentImageUrl = isEditing ? editForm.imageUrl : imageUrl;
+    const currentDeviceImages = isEditing ? editForm.deviceImages : deviceImages;
+    const currentCccdFrontUrl = isEditing ? editForm.cccdFrontUrl : cccdFrontUrl;
+    const currentCccdBackUrl = isEditing ? editForm.cccdBackUrl : cccdBackUrl;
+
     const currentStatus = statusConfig[status as keyof typeof statusConfig] || statusConfig['REQUESTED'];
     const totalCost = (Number(estimatedValue) || 0) + (Number(otherCosts) || 0) + (Number(topUp) || 0);
 
     let parsedDeviceImages: string[] = [];
-    if (Array.isArray(deviceImages)) {
-        parsedDeviceImages = deviceImages as unknown as string[];
-    } else if (typeof deviceImages === 'string' && deviceImages.trim() !== '') {
+    if (Array.isArray(currentDeviceImages)) {
+        parsedDeviceImages = currentDeviceImages as unknown as string[];
+    } else if (typeof currentDeviceImages === 'string' && currentDeviceImages.trim() !== '') {
         try {
-            const parsed = JSON.parse(deviceImages);
+            const parsed = JSON.parse(currentDeviceImages);
             if (Array.isArray(parsed)) {
                 parsedDeviceImages = parsed;
             }
@@ -107,47 +154,6 @@ export default function TradeInDetailPage() {
             parsedDeviceImages = [];
         }
     }
-
-    const receiveMutation = useMutation({
-        mutationFn: () => inboundApi.receiveItems(id!),
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['trade-in-item', id] });
-            alert('Đã nhận hàng thành công. Chuyển sang trạng thái Đang chờ QC.');
-        },
-        onError: (err: any) => {
-            alert(err?.response?.data?.message || 'Lỗi khi nhận hàng');
-        }
-    });
-
-    const completeMutation = useMutation({
-        mutationFn: (notes?: string) => inboundApi.completeQC(id!, notes),
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['trade-in-item', id] });
-            alert('Đã hoàn tất nhập kho thành công!');
-        },
-        onError: (err: any) => {
-            const errorMsg = err?.response?.data?.message || err?.message || 'Lỗi khi nhập kho';
-            console.error('Complete QC Error:', err);
-            alert('Lỗi nhập kho: ' + errorMsg);
-        }
-    });
-
-    const updateMutation = useMutation({
-        mutationFn: (data: any) => {
-            // Update the item-level data using the first item's ID
-            const itemId = request?.items?.[0]?.id;
-            if (!itemId) throw new Error('Item ID not found');
-            return inboundApi.updateItem(itemId, data);
-        },
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['trade-in-item', id] });
-            setIsEditing(false);
-            alert('Cập nhật thông tin thành công!');
-        },
-        onError: (err: any) => {
-            alert(err?.response?.data?.message || 'Lỗi khi cập nhật');
-        }
-    });
 
     const handleEdit = () => {
         setEditForm({
@@ -238,7 +244,7 @@ export default function TradeInDetailPage() {
             <span style={{ fontSize: 12, fontWeight: 600, color: '#64748b' }}>{label}</span>
             {url ? (
                 <div
-                    onClick={() => setImageModal({ url, title: label })}
+                    onClick={() => setImageModal({ url: resolveImageUrl(url), title: label })}
                     style={{
                         display: 'block', borderRadius: 12, overflow: 'hidden',
                         border: '1px solid #e2e8f0', height: 160, width: '100%',
@@ -254,7 +260,7 @@ export default function TradeInDetailPage() {
                         e.currentTarget.style.boxShadow = 'none';
                     }}
                 >
-                    <img src={url} alt={label} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    <img src={resolveImageUrl(url)} alt={label} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                     <div style={{
                         position: 'absolute', top: 8, right: 8,
                         background: 'rgba(0,0,0,0.6)', borderRadius: 8,
@@ -706,8 +712,8 @@ export default function TradeInDetailPage() {
                             {parsedDeviceImages.slice(1, 4).map((url: string, idx: number) => (
                                 <ImgPreview key={idx} url={url} label={`Ảnh thiết bị ${idx + 2}`} />
                             ))}
-                            <ImgPreview url={cccdFrontUrl || ''} label="CCCD mặt trước" />
-                            <ImgPreview url={cccdBackUrl || ''} label="CCCD mặt sau" />
+                            <ImgPreview url={currentCccdFrontUrl || ''} label="CCCD mặt trước" />
+                            <ImgPreview url={currentCccdBackUrl || ''} label="CCCD mặt sau" />
                         </div>
                     </Card>
 
@@ -739,7 +745,7 @@ export default function TradeInDetailPage() {
                     </button>
                     <div style={{ maxWidth: '90%', maxHeight: '90%', textAlign: 'center' }}>
                         <img
-                            src={imageModal.url}
+                            src={resolveImageUrl(imageModal.url)}
                             alt={imageModal.title}
                             style={{ maxWidth: '100%', maxHeight: '85vh', objectFit: 'contain', borderRadius: 8 }}
                             onClick={(e) => e.stopPropagation()}

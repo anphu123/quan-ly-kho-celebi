@@ -59,8 +59,8 @@ export default function CreateTradeInPage() {
             return inboundApi.createRequest({
                 warehouseId,
                 supplierType: 'CUSTOMER_TRADE_IN',
-                supplierName: supplier?.name || 'Unknown Store',
-                notes: 'Thu cũ Xiaomi từ Store',
+                supplierName: supplier?.name || 'Cửa hàng chưa xác định',
+                notes: 'Thu cũ Xiaomi từ cửa hàng',
                 items: items.map(item => ({ ...item }))
             });
         },
@@ -104,7 +104,7 @@ export default function CreateTradeInPage() {
                         contractNumber: row[1]?.toString(),
                         purchaseDate: parseExcelDate(row[2]),
                         employeeName: row[3]?.toString(),
-                        modelName: row[4]?.toString() || 'Unknown Model',
+                        modelName: row[4]?.toString() || 'Thiết bị chưa xác định',
                         serialNumber: row[5]?.toString(),
                         notes: row[6]?.toString(),
                         estimatedValue: row[7] ? Number(row[7]) : undefined,
@@ -139,9 +139,9 @@ export default function CreateTradeInPage() {
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!warehouseId) { setError('Vui lòng chọn Kho nhận'); return; }
-        if (!supplierId) { setError('Vui lòng chọn Store (Cửa hàng)'); return; }
+        if (!supplierId) { setError('Vui lòng chọn cửa hàng'); return; }
         if (!categoryId) { setError('Vui lòng chọn Danh mục sản phẩm'); return; }
-        if (items.length === 0) { setError('Vui lòng upload danh sách máy'); return; }
+        if (items.length === 0) { setError('Vui lòng tải lên danh sách máy'); return; }
         createMutation.mutate();
     };
 
@@ -154,8 +154,8 @@ export default function CreateTradeInPage() {
                 <button onClick={() => navigate('/trade-in-xiaomi')} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 13, color: '#6366f1', background: 'none', border: 'none', cursor: 'pointer', marginBottom: 12, fontWeight: 600 }}>
                     <ArrowLeft size={15} /> Quay lại danh sách
                 </button>
-                <h1 style={{ margin: 0, fontSize: 24, fontWeight: 900, color: '#0f172a' }}>Tạo lô Trade-in mới <span style={{ color: '#6366f1' }}>(Batch)</span></h1>
-                <p style={{ margin: '6px 0 0', fontSize: 13, color: '#64748b' }}>Upload file Excel danh sách máy thu cũ từ Store Xiaomi</p>
+                <h1 style={{ margin: 0, fontSize: 24, fontWeight: 900, color: '#0f172a' }}>Tạo lô thu cũ mới <span style={{ color: '#6366f1' }}>(Lô)</span></h1>
+                <p style={{ margin: '6px 0 0', fontSize: 13, color: '#64748b' }}>Tải lên file Excel danh sách máy thu cũ từ cửa hàng Xiaomi</p>
             </div>
 
             {/* ── Error ── */}
@@ -176,13 +176,13 @@ export default function CreateTradeInPage() {
                         </div>
                         <div>
                             <p style={{ margin: 0, fontWeight: 800, color: '#0f172a', fontSize: 14 }}>Thông tin chung</p>
-                            <p style={{ margin: 0, fontSize: 12, color: '#94a3b8' }}>Chọn Store gửi hàng và Kho nhận</p>
+                            <p style={{ margin: 0, fontSize: 12, color: '#94a3b8' }}>Chọn cửa hàng gửi hàng và kho nhận</p>
                         </div>
                     </div>
                     <div style={{ padding: '20px 24px', display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
                         <div>
                             <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 700, color: '#374151', marginBottom: 8 }}>
-                                <Building2 size={14} color="#6366f1" /> Cửa hàng (Store) gửi hàng <span style={{ color: '#ef4444' }}>*</span>
+                                <Building2 size={14} color="#6366f1" /> Cửa hàng gửi hàng <span style={{ color: '#ef4444' }}>*</span>
                             </label>
                             <select value={supplierId} onChange={e => setSupplierId(e.target.value)} required
                                 style={{ width: '100%', height: 42, borderRadius: 10, border: '1.5px solid #e2e8f0', fontSize: 13, paddingLeft: 12, paddingRight: 32, background: '#fff', outline: 'none', color: '#0f172a', appearance: 'none' }}>
@@ -213,14 +213,14 @@ export default function CreateTradeInPage() {
                     </div>
                 </div>
 
-                {/* ── Step 2: Upload Excel ── */}
+                {/* ── Step 2: Tải lên Excel ── */}
                 <div style={{ background: '#fff', borderRadius: 16, boxShadow: '0 2px 12px rgba(0,0,0,.06)', border: '1px solid #f1f5f9', overflow: 'hidden' }}>
                     <div style={{ padding: '16px 24px', borderBottom: '1px solid #f1f5f9', display: 'flex', alignItems: 'center', gap: 10 }}>
                         <div style={{ width: 32, height: 32, borderRadius: 8, background: 'linear-gradient(135deg,#10b981,#059669)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                             <span style={{ color: '#fff', fontWeight: 900, fontSize: 14 }}>2</span>
                         </div>
                         <div>
-                            <p style={{ margin: 0, fontWeight: 800, color: '#0f172a', fontSize: 14 }}>Upload file Excel</p>
+                            <p style={{ margin: 0, fontWeight: 800, color: '#0f172a', fontSize: 14 }}>Tải lên file Excel</p>
                             <p style={{ margin: 0, fontSize: 12, color: '#94a3b8' }}>File phải có tiêu đề chứa STT hoặc IMEI</p>
                         </div>
                     </div>
@@ -247,7 +247,7 @@ export default function CreateTradeInPage() {
                                         <p style={{ margin: '4px 0 0', fontSize: 12, color: '#94a3b8' }}>Hỗ trợ .xlsx, .xls — tự động nhận diện cột</p>
                                     </div>
                                     <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: '#eef2ff', padding: '4px 12px', borderRadius: 20, fontSize: 12, color: '#6366f1', fontWeight: 600 }}>
-                                        <Upload size={12} /> Chọn file
+                                        <Upload size={12} /> Chọn tệp
                                     </div>
                                 </>
                             )}
@@ -277,7 +277,7 @@ export default function CreateTradeInPage() {
                             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
                                 <thead>
                                     <tr style={{ background: '#f8fafc', borderBottom: '2px solid #e2e8f0' }}>
-                                        {['STT', 'Số HĐ', 'Ngày mua', 'Nhân viên', 'Thiết bị', 'Serial/IMEI', 'Loại test', 'Giá thu', 'CP khác', 'Topup', 'Tổng giá thu', 'Giá SC', 'Khách hàng', 'ĐT', 'CCCD', 'STK NH', 'Ngân hàng'].map(h => (
+                                        {['STT', 'Số HĐ', 'Ngày mua', 'Nhân viên', 'Thiết bị', 'Serial/IMEI', 'Loại test', 'Giá thu', 'CP khác', 'Bù thêm', 'Tổng giá thu', 'Giá SC', 'Khách hàng', 'ĐT', 'CCCD', 'STK NH', 'Ngân hàng'].map(h => (
                                             <th key={h} style={{ padding: '10px 12px', textAlign: 'left', fontSize: 11, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em', whiteSpace: 'nowrap' }}>{h}</th>
                                         ))}
                                     </tr>

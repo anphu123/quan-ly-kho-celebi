@@ -27,7 +27,7 @@ const getApiBaseUrl = () => {
 };
 
 const API_BASE = getApiBaseUrl();
-console.log('⚙️ Admin API Base URL:', API_BASE);
+  console.log('⚙️ API quản trị:', API_BASE);
 
 export default function AdminOpsPage() {
   const queryClient = useQueryClient();
@@ -78,28 +78,28 @@ export default function AdminOpsPage() {
   const completeInboundMutation = useMutation({
     mutationFn: async () => {
       setIsProcessing(true);
-      addLog('Bắt đầu workflow Complete Inbound → Inventory...');
+      addLog('Bắt đầu luồng Hoàn tất nhập kho → Tồn kho...');
 
       const headers = await getAuthHeaders();
 
       // 1. Get IN_PROGRESS inbound requests
-      addLog('🔍 Tìm inbound requests IN_PROGRESS...');
+      addLog('🔍 Tìm yêu cầu nhập kho IN_PROGRESS...');
       const inboundResponse = await fetch(`${API_BASE}/inbound/requests`, { headers });
       const inboundData = await inboundResponse.json();
       const inProgressRequests = inboundData.data?.filter((req: any) => req.status === 'IN_PROGRESS') || [];
 
       if (inProgressRequests.length === 0) {
-        addLog('❌ Không có inbound request IN_PROGRESS nào');
+        addLog('❌ Không có yêu cầu nhập kho IN_PROGRESS nào');
         return;
       }
 
       const targetRequest = inProgressRequests[0];
-      addLog(`✅ Tìm thấy request: ${targetRequest.code} với ${targetRequest.items.length} items`);
+      addLog(`✅ Tìm thấy yêu cầu: ${targetRequest.code} với ${targetRequest.items.length} thiết bị`);
 
       // 2. Complete the first item manually (simulate receiving process)
       if (targetRequest.items.length > 0) {
         const firstItem = targetRequest.items[0];
-        addLog(`📦 Đang complete item: ${firstItem.modelName}...`);
+        addLog(`📦 Đang hoàn tất thiết bị: ${firstItem.modelName}...`);
 
         try {
           const completeData = {
@@ -107,15 +107,15 @@ export default function AdminOpsPage() {
             items: [{
               inboundItemId: firstItem.id,
               serialNumber: `SN${Date.now().toString().slice(-6)}`,
-              condition: 'Good',
+              condition: 'Tốt',
               purchasePrice: 15000000,
               binLocation: 'A-01-01',
-              notes: 'Completed via Admin Ops Panel'
+              notes: 'Hoàn tất qua bảng điều khiển quản trị'
             }],
-            notes: 'Simulated completion for testing workflow'
+            notes: 'Mô phỏng hoàn tất để kiểm thử luồng'
           };
 
-          addLog('📡 Gửi Complete Inbound request...');
+          addLog('📡 Gửi yêu cầu Hoàn tất nhập kho...');
           const completeResponse = await fetch(`${API_BASE}/inbound/complete`, {
             method: 'POST',
             headers,
@@ -124,23 +124,23 @@ export default function AdminOpsPage() {
 
           if (completeResponse.ok) {
             await completeResponse.json();
-            addLog(`✅ Thành công! Item đã được receive`);
-            addLog(`📊 Serial item được tạo với status: AVAILABLE`);
+            addLog(`✅ Thành công! Thiết bị đã được nhận`);
+            addLog(`📊 Serial đã được tạo với trạng thái: AVAILABLE`);
           } else {
             const error = await completeResponse.text();
-            addLog(`❌ Lỗi complete inbound: ${error}`);
+            addLog(`❌ Lỗi hoàn tất nhập kho: ${error}`);
             throw new Error(error);
           }
 
         } catch (error: any) {
-          addLog(`❌ Exception: ${error.message}`);
-          throw error;
-        }
+        addLog(`❌ Ngoại lệ: ${error.message}`);
+        throw error;
       }
+    }
 
-      addLog('🔄 Refresh stats...');
+      addLog('🔄 Làm mới thống kê...');
       await refetchStats();
-      addLog('✨ Workflow hoàn thành!');
+      addLog('✨ Hoàn tất luồng!');
     },
     onSettled: () => {
       setIsProcessing(false);
@@ -156,12 +156,12 @@ export default function AdminOpsPage() {
         <div>
           <div className="page-tag">
             <Terminal size={11} />
-            Super Admin Operations
+            Vận hành Super Admin
             <span className="page-tag-dot" />
           </div>
-          <h1 className="page-title">Admin <span>Control Panel</span></h1>
+          <h1 className="page-title">Quản trị <span>Điều khiển</span></h1>
           <p className="page-desc">
-            Quản lý hệ thống, debug workflows và simulate data cho testing.
+            Quản lý hệ thống, gỡ lỗi luồng và mô phỏng dữ liệu để kiểm thử.
           </p>
         </div>
       </div>
@@ -169,10 +169,10 @@ export default function AdminOpsPage() {
       {/* System Stats */}
       <div className="page-stats-grid">
         {[
-          { label: 'Inbound Requests', value: systemStats?.inboundTotal || 0, icon: Upload, color: 'blue', suffix: 'total' },
-          { label: 'In Progress', value: systemStats?.inboundInProgress || 0, icon: Clock, color: 'amber', suffix: 'pending' },
-          { label: 'Inventory Items', value: systemStats?.inventoryItems || 0, icon: Package, color: 'emerald', suffix: 'in stock' },
-          { label: 'Warehouses', value: systemStats?.warehousesTotal || 0, icon: Database, color: 'purple', suffix: 'active' },
+          { label: 'Yêu cầu nhập kho', value: systemStats?.inboundTotal || 0, icon: Upload, color: 'blue', suffix: 'tổng' },
+          { label: 'Đang xử lý', value: systemStats?.inboundInProgress || 0, icon: Clock, color: 'amber', suffix: 'chờ' },
+          { label: 'Thiết bị tồn kho', value: systemStats?.inventoryItems || 0, icon: Package, color: 'emerald', suffix: 'tồn kho' },
+          { label: 'Kho hàng', value: systemStats?.warehousesTotal || 0, icon: Database, color: 'purple', suffix: 'đang hoạt động' },
         ].map((s) => (
           <div key={s.label} className="page-stat-card">
             <div className={`page-stat-icon ${s.color}`}><s.icon size={20} /></div>
@@ -196,7 +196,7 @@ export default function AdminOpsPage() {
               </div>
               <div>
                 <h3 style={{ fontWeight: 800, color: '#0f172a', fontSize: '1.125rem', marginBottom: '0.25rem' }}>
-                  Workflow Simulator
+                  Mô phỏng luồng
                 </h3>
                 <p style={{ color: '#64748b', fontSize: '0.875rem' }}>
                   Test luồng nhập kho → tồn kho
@@ -210,8 +210,8 @@ export default function AdminOpsPage() {
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '1rem', background: '#f8fafc', borderRadius: '0.75rem', border: '1px solid #e2e8f0' }}>
                 <CheckCircle size={20} style={{ color: '#10b981', flexShrink: 0 }} />
                 <div style={{ flex: 1 }}>
-                  <p style={{ fontWeight: 700, color: '#0f172a', fontSize: '0.875rem' }}>1. Tìm Inbound IN_PROGRESS</p>
-                  <p style={{ color: '#64748b', fontSize: '0.75rem' }}>Lấy request và items chưa receive</p>
+                  <p style={{ fontWeight: 700, color: '#0f172a', fontSize: '0.875rem' }}>1. Tìm yêu cầu IN_PROGRESS</p>
+                  <p style={{ color: '#64748b', fontSize: '0.75rem' }}>Lấy yêu cầu và thiết bị chưa nhận</p>
                 </div>
                 <ArrowRight size={16} style={{ color: '#94a3b8' }} />
               </div>
@@ -219,8 +219,8 @@ export default function AdminOpsPage() {
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '1rem', background: '#f8fafc', borderRadius: '0.75rem', border: '1px solid #e2e8f0' }}>
                 <Activity size={20} style={{ color: '#f59e0b', flexShrink: 0 }} />
                 <div style={{ flex: 1 }}>
-                  <p style={{ fontWeight: 700, color: '#0f172a', fontSize: '0.875rem' }}>2. Complete Items</p>
-                  <p style={{ color: '#64748b', fontSize: '0.75rem' }}>Set serial number, condition, price</p>
+                  <p style={{ fontWeight: 700, color: '#0f172a', fontSize: '0.875rem' }}>2. Hoàn tất thiết bị</p>
+                  <p style={{ color: '#64748b', fontSize: '0.75rem' }}>Gán serial, tình trạng, giá</p>
                 </div>
                 <ArrowRight size={16} style={{ color: '#94a3b8' }} />
               </div>
@@ -228,8 +228,8 @@ export default function AdminOpsPage() {
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '1rem', background: '#f8fafc', borderRadius: '0.75rem', border: '1px solid #e2e8f0' }}>
                 <TrendingUp size={20} style={{ color: '#8b5cf6', flexShrink: 0 }} />
                 <div style={{ flex: 1 }}>
-                  <p style={{ fontWeight: 700, color: '#0f172a', fontSize: '0.875rem' }}>3. Tạo Inventory</p>
-                  <p style={{ color: '#64748b', fontSize: '0.75rem' }}>Serial items → Stock levels</p>
+                  <p style={{ fontWeight: 700, color: '#0f172a', fontSize: '0.875rem' }}>3. Tạo tồn kho</p>
+                  <p style={{ color: '#64748b', fontSize: '0.75rem' }}>Serial → Mức tồn</p>
                 </div>
               </div>
 
@@ -242,7 +242,7 @@ export default function AdminOpsPage() {
                 {isProcessing ? (
                   <><Loader2 size={16} className="animate-spin" /> Đang xử lý...</>
                 ) : (
-                  <><Play size={16} /> Chạy Workflow</>
+                  <><Play size={16} /> Chạy luồng</>
                 )}
               </button>
 
@@ -259,8 +259,8 @@ export default function AdminOpsPage() {
                   <Terminal size={16} />
                 </div>
                 <div>
-                  <h3 style={{ fontWeight: 800, color: '#0f172a', fontSize: '1.125rem' }}>System Logs</h3>
-                  <p style={{ color: '#64748b', fontSize: '0.875rem' }}>{logs.length} entries</p>
+                  <h3 style={{ fontWeight: 800, color: '#0f172a', fontSize: '1.125rem' }}>Nhật ký hệ thống</h3>
+                  <p style={{ color: '#64748b', fontSize: '0.875rem' }}>{logs.length} dòng</p>
                 </div>
               </div>
               <button
@@ -282,7 +282,7 @@ export default function AdminOpsPage() {
             }}>
               {logs.length === 0 ? (
                 <p style={{ color: '#64748b', fontSize: '0.875rem', textAlign: 'center', padding: '2rem 0' }}>
-                  Chưa có log nào. Chạy workflow để xem logs.
+                  Chưa có nhật ký nào. Chạy luồng để xem nhật ký.
                 </p>
               ) : logs.map((log, index) => (
                 <div key={index} style={{

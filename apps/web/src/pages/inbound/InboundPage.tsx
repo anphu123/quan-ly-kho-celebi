@@ -148,7 +148,7 @@ function EditItemModal({ item, onClose }: { item: any; onClose: () => void }) {
                             <div style={{ width: 120, height: 120, borderRadius: 12, border: '2px dashed #c7d2fe', background: '#fafbff', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', flexShrink: 0, cursor: 'pointer' }}
                                 onClick={() => fileRef.current?.click()}>
                                 {previewImage ? (
-                                    <img src={previewImage} alt="preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                    <img src={resolveImageUrl(previewImage)} alt="preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                                 ) : (
                                     <div style={{ textAlign: 'center', color: '#94a3b8' }}>
                                         <ImageIcon size={28} style={{ marginBottom: 4 }} />
@@ -178,7 +178,7 @@ function EditItemModal({ item, onClose }: { item: any; onClose: () => void }) {
                         <F label="Tên nhân viên thu" name="employeeName" span={2} />
                         <F label="Giá thu mua (đ)" name="estimatedValue" type="number" />
                         <F label="Chi phí khác (đ)" name="otherCosts" type="number" />
-                        <F label="Topup (đ)" name="topUp" type="number" />
+                        <F label="Bù thêm (đ)" name="topUp" type="number" />
                         <F label="Giá sửa chữa (đ)" name="repairCost" type="number" />
                         <div style={{ gridColumn: 'span 2' }}>
                             <p style={{ margin: 0, fontSize: 13, color: '#64748b' }}>Tổng giá thu: <span style={{ fontWeight: 900, fontSize: 18, color: '#6366f1', marginLeft: 8 }}>{totalPrice.toLocaleString('vi-VN')} đ</span></p>
@@ -339,7 +339,7 @@ export default function InboundPage() {
                 <div style={{ display: 'flex', gap: 10 }}>
                     <button onClick={() => setShowCreateModal(true)}
                         style={{ display: 'inline-flex', alignItems: 'center', gap: 7, padding: '9px 18px', background: 'linear-gradient(135deg,#6366f1,#8b5cf6)', border: 'none', borderRadius: 10, fontSize: 13, fontWeight: 700, color: '#fff', cursor: 'pointer', boxShadow: '0 4px 12px rgba(99,102,241,.35)' }}>
-                        <Plus size={16} /> Tạo đơn trade-in
+                        <Plus size={16} /> Tạo đơn thu cũ
                     </button>
                 </div>
             </div>
@@ -567,7 +567,7 @@ export default function InboundPage() {
                                 <Smartphone size={28} color="#cbd5e1" />
                             </div>
                             <p style={{ margin: 0, fontSize: 15, fontWeight: 700, color: '#64748b' }}>Không có kết quả</p>
-                            <p style={{ margin: '6px 0 0', fontSize: 13, color: '#94a3b8' }}>Thử thay đổi bộ lọc hoặc tạo Trade-in mới</p>
+                            <p style={{ margin: '6px 0 0', fontSize: 13, color: '#94a3b8' }}>Thử thay đổi bộ lọc hoặc tạo đơn thu cũ mới</p>
                         </div>
                     ) : (
                         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
@@ -578,7 +578,7 @@ export default function InboundPage() {
                                     <th style={{ ...stickyLeft(40), padding: '11px 12px', textAlign: 'left', fontSize: 11, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em', whiteSpace: 'nowrap', background: '#f8fafc' }}>Ảnh</th>
                                     <th style={{ ...stickyLeft(100, true), padding: '11px 12px', textAlign: 'left', fontSize: 11, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em', whiteSpace: 'nowrap', background: '#f8fafc' }}>Thiết bị</th>
                                     {/* Scrollable columns */}
-                                    {['Store / Kho', 'Số HĐ', 'Ngày', 'NV', 'IMEI', 'Loại test', 'Giá thu', 'CP khác', 'Topup', 'Tổng', 'Giá SC', 'Khách hàng', 'ĐT', 'CCCD', 'Ngày cấp', 'Nơi cấp', 'ĐC', 'STK NH', 'Ngân hàng', 'TT'].map(h => (
+                                    {['Cửa hàng / Kho', 'Số HĐ', 'Ngày', 'NV', 'IMEI', 'Loại test', 'Giá thu', 'CP khác', 'Bù thêm', 'Tổng', 'Giá SC', 'Khách hàng', 'ĐT', 'CCCD', 'Ngày cấp', 'Nơi cấp', 'ĐC', 'STK NH', 'Ngân hàng', 'TT'].map(h => (
                                         <th key={h} style={{ padding: '11px 12px', textAlign: 'left', fontSize: 11, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em', whiteSpace: 'nowrap' }}>{h}</th>
                                     ))}
                                     {/* Sticky right: Actions */}
@@ -599,7 +599,7 @@ export default function InboundPage() {
                                             {/* Sticky left: Ảnh */}
                                             <td style={{ ...stickyLeft(40), padding: '10px 12px', whiteSpace: 'nowrap' }}>
                                                 {item.imageUrl ? (
-                                                    <img src={item.imageUrl} alt="device" style={{ width: 40, height: 40, borderRadius: 6, objectFit: 'cover', border: '1px solid #e2e8f0', cursor: 'pointer' }} onClick={() => setEditingItem(item)} />
+                                                    <img src={resolveImageUrl(item.imageUrl)} alt="device" style={{ width: 40, height: 40, borderRadius: 6, objectFit: 'cover', border: '1px solid #e2e8f0', cursor: 'pointer' }} onClick={() => setEditingItem(item)} />
                                                 ) : (
                                                     <div style={{ width: 40, height: 40, borderRadius: 6, background: '#f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }} onClick={() => setEditingItem(item)}>
                                                         <ImageIcon size={16} color="#94a3b8" />

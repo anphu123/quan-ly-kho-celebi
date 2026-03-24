@@ -72,18 +72,18 @@ export default function LoginPage() {
           </div>
           <div className="login-feature-card">
             <div className="login-feature-icon blue"><RefreshCw size={18} /></div>
-            <h3>Real-time Sync</h3>
+            <h3>Đồng bộ thời gian thực</h3>
             <p>Đồng bộ trạng thái tức thì trên toàn hệ thống.</p>
           </div>
           <div className="login-feature-card">
             <div className="login-feature-icon rose"><Database size={18} /></div>
-            <h3>Multi-warehouse</h3>
+            <h3>Đa kho</h3>
             <p>Quản lý không giới hạn điểm lưu kho.</p>
           </div>
         </div>
 
         {/* Footer */}
-        <p className="login-footer-copy">© 2026 CELEBI TECH — THE GLOBAL WEAR STRUCTURE</p>
+        <p className="login-footer-copy">© 2026 CELEBI TECH — KẾT CẤU VẬN HÀNH TOÀN CẦU</p>
       </div>
 
       {/* ---- RIGHT PANEL ---- */}
@@ -113,7 +113,7 @@ export default function LoginPage() {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   className="login-input"
-                  placeholder="name@company.com"
+                  placeholder="ten@congty.com"
                 />
               </div>
             </div>
@@ -168,7 +168,7 @@ export default function LoginPage() {
               onClick={() => { setEmail("admin@celebi.com"); setPassword("Admin@123"); }}
             >
               <span className="login-quick-icon"><ShieldCheck size={18} /></span>
-              <span className="login-quick-label">Super Admin</span>
+              <span className="login-quick-label">Siêu quản trị</span>
             </button>
             <button type="button" className="login-quick-btn">
               <span className="login-quick-icon"><Zap size={18} /></span>

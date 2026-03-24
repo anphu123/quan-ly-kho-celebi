@@ -179,8 +179,8 @@ export default function CreateSingleTradeInPage() {
             return inboundApi.createRequest({
                 warehouseId,
                 supplierType: 'CUSTOMER_TRADE_IN',
-                supplierName: supplier?.name || 'Unknown Store',
-                notes: 'Thu cũ 1 máy lẻ từ Store',
+                supplierName: supplier?.name || 'Cửa hàng chưa xác định',
+                notes: 'Thu cũ 1 máy lẻ từ cửa hàng',
                 items: [{
                     ...(item as CreateInboundItem),
                     imageUrl: imageData.deviceUrls[0] || undefined,
@@ -200,7 +200,7 @@ export default function CreateSingleTradeInPage() {
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!warehouseId) { setError('Vui lòng chọn Kho nhận'); return; }
-        if (!supplierId) { setError('Vui lòng chọn Store'); return; }
+        if (!supplierId) { setError('Vui lòng chọn cửa hàng'); return; }
         if (!item.categoryId) { setError('Vui lòng chọn Danh mục sản phẩm'); return; }
         if (!item.modelName) { setError('Vui lòng nhập Tên thiết bị'); return; }
 
@@ -216,7 +216,7 @@ export default function CreateSingleTradeInPage() {
             ]);
             createMutation.mutate({ deviceUrls, cccdFrontUrl, cccdBackUrl });
         } catch (uploadErr: any) {
-            setError('Lỗi upload ảnh: ' + (uploadErr.response?.data?.message || uploadErr.message));
+            setError('Lỗi tải lên ảnh: ' + (uploadErr.response?.data?.message || uploadErr.message));
             setUploading(false);
         }
     };
@@ -240,8 +240,8 @@ export default function CreateSingleTradeInPage() {
                         <Smartphone size={24} color="#fff" />
                     </div>
                     <div>
-                        <h1 style={{ margin: 0, fontSize: 22, fontWeight: 900, color: '#0f172a' }}>Tạo 1 máy Trade-in mới</h1>
-                        <p style={{ margin: '4px 0 0', fontSize: 13, color: '#64748b' }}>Nhập thông tin + upload ảnh thiết bị và CCCD</p>
+                        <h1 style={{ margin: 0, fontSize: 22, fontWeight: 900, color: '#0f172a' }}>Tạo 1 máy thu cũ mới</h1>
+                        <p style={{ margin: '4px 0 0', fontSize: 13, color: '#64748b' }}>Nhập thông tin + tải lên ảnh thiết bị và CCCD</p>
                     </div>
                 </div>
             </div>
@@ -257,11 +257,11 @@ export default function CreateSingleTradeInPage() {
             <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
 
                 {/* Step 1: Điều phối */}
-                <SectionCard step="1" title="Điều phối" subtitle="Từ Store nào và nhập Kho nào?" color="linear-gradient(135deg,#6366f1,#8b5cf6)">
+                <SectionCard step="1" title="Điều phối" subtitle="Từ cửa hàng nào và nhập kho nào?" color="linear-gradient(135deg,#6366f1,#8b5cf6)">
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
                         <Field label="Cửa hàng gửi *" icon={<Building2 size={12} color="#6366f1" />}>
                             <select value={supplierId} onChange={e => setSupplierId(e.target.value)} required style={{ ...inputStyle, appearance: 'none' }}>
-                                <option value="">— Chọn Store —</option>
+                                <option value="">— Chọn cửa hàng —</option>
                                 {suppliers.map((s: any) => <option key={s.id} value={s.id}>{s.name} ({s.code})</option>)}
                             </select>
                         </Field>
@@ -275,7 +275,7 @@ export default function CreateSingleTradeInPage() {
                 </SectionCard>
 
                 {/* Step 2: Ảnh thiết bị */}
-                <SectionCard step="2" title="Hình ảnh thiết bị" subtitle="Upload nhiều ảnh — hệ thống lưu lên server, không base64" color="linear-gradient(135deg,#8b5cf6,#ec4899)">
+                <SectionCard step="2" title="Hình ảnh thiết bị" subtitle="Tải lên nhiều ảnh — hệ thống lưu lên server, không base64" color="linear-gradient(135deg,#8b5cf6,#ec4899)">
                     <MultiImageGallery
                         files={deviceFiles}
                         previews={devicePreviews}
@@ -323,7 +323,7 @@ export default function CreateSingleTradeInPage() {
                         <Field label="Chi phí khác (đ)">
                             <input type="number" name="otherCosts" style={inputStyle} value={item.otherCosts || ''} onChange={onInput} placeholder="0" />
                         </Field>
-                        <Field label="Topup (đ)">
+                        <Field label="Bù thêm (đ)">
                             <input type="number" name="topUp" style={inputStyle} value={item.topUp || ''} onChange={onInput} placeholder="0" />
                         </Field>
                         <div style={{ gridColumn: '1 / 3', display: 'flex', alignItems: 'center', background: '#f0f4ff', padding: '10px 16px', borderRadius: 10 }}>
@@ -368,7 +368,7 @@ export default function CreateSingleTradeInPage() {
                 </SectionCard>
 
                 {/* Step 5: Ảnh CCCD */}
-                <SectionCard step="5" title="Ảnh CCCD / Giấy tờ tùy thân" subtitle="Upload 2 mặt CCCD — lưu server, không gây lỗi quá tải" color="linear-gradient(135deg,#0ea5e9,#6366f1)">
+                <SectionCard step="5" title="Ảnh CCCD / Giấy tờ tùy thân" subtitle="Tải lên 2 mặt CCCD — lưu server, không gây lỗi quá tải" color="linear-gradient(135deg,#0ea5e9,#6366f1)">
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
                         <ImageBox
                             label="Mặt trước CCCD"
@@ -408,7 +408,7 @@ export default function CreateSingleTradeInPage() {
                     </button>
                     <button type="submit" disabled={isBusy}
                         style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '10px 28px', borderRadius: 10, border: 'none', background: 'linear-gradient(135deg,#6366f1,#8b5cf6)', color: '#fff', fontSize: 13, fontWeight: 700, cursor: isBusy ? 'not-allowed' : 'pointer', boxShadow: '0 4px 12px rgba(99,102,241,.35)', opacity: isBusy ? 0.7 : 1 }}>
-                        {isBusy ? <><Loader2 size={15} style={{ animation: 'spin 1s linear infinite' }} /> {uploading ? 'Đang upload ảnh...' : 'Đang lưu...'}</> : <><Save size={15} /> Lưu Trade-in</>}
+                        {isBusy ? <><Loader2 size={15} style={{ animation: 'spin 1s linear infinite' }} /> {uploading ? 'Đang tải lên ảnh...' : 'Đang lưu...'}</> : <><Save size={15} /> Lưu thu cũ</>}
                     </button>
                 </div>
             </form>

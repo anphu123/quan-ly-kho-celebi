@@ -16,12 +16,12 @@ import {
 
 const GRADE_LABELS: Record<string, string> = {
   GRADE_A_NEW: 'A+ Mới',
-  GRADE_A: 'Grade A',
-  GRADE_B_PLUS: 'Grade B+',
-  GRADE_B: 'Grade B',
-  GRADE_C_PLUS: 'Grade C+',
-  GRADE_C: 'Grade C',
-  GRADE_D: 'Grade D',
+  GRADE_A: 'Hạng A',
+  GRADE_B_PLUS: 'Hạng B+',
+  GRADE_B: 'Hạng B',
+  GRADE_C_PLUS: 'Hạng C+',
+  GRADE_C: 'Hạng C',
+  GRADE_D: 'Hạng D',
 };
 
 const STATUS_COLORS: Record<SerialStatus, string> = {
@@ -158,7 +158,7 @@ export default function InventoryPage() {
                 <th>Serial / Mã nội bộ</th>
                 <th>Kho</th>
                 <th className="center">Trạng thái</th>
-                <th className="center">Grade</th>
+                <th className="center">Phân hạng</th>
                 <th className="right">Giá vốn</th>
                 <th className="right">Thao tác</th>
               </tr>
@@ -309,7 +309,7 @@ function StatusModal({ item, onClose, onSuccess }: { item: SerialItem; onClose: 
           </div>
 
           <div className="form-field">
-            <label className="form-label">Vị trí kho (bin)</label>
+            <label className="form-label">Vị trí kho (ô/kệ)</label>
             <input
               type="text"
               className="form-input"
@@ -327,7 +327,7 @@ function StatusModal({ item, onClose, onSuccess }: { item: SerialItem; onClose: 
               onChange={e => setFormData(p => ({ ...p, notes: e.target.value }))}
               rows={3}
               style={{ resize: 'none' }}
-              placeholder="VD: Đã QC xong, máy đạt Grade A..."
+              placeholder="VD: Đã QC xong, máy đạt hạng A..."
             />
           </div>
 

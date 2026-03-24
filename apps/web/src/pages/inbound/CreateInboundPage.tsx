@@ -22,9 +22,9 @@ const CONDITION_LEVELS = [
 ];
 
 const SUPPLIER_TYPES = [
-  { val: 'INDIVIDUAL_SELLER', label: '🏪 Bán lẻ (Individual)' },
-  { val: 'CUSTOMER_TRADE_IN', label: '🔄 Trade-in (Thu cũ)' },
-  { val: 'LIQUIDATION', label: '📦 Thanh lý (Bulk)' },
+  { val: 'INDIVIDUAL_SELLER', label: '🏪 Bán lẻ' },
+  { val: 'CUSTOMER_TRADE_IN', label: '🔄 Thu cũ' },
+  { val: 'LIQUIDATION', label: '📦 Thanh lý' },
   { val: 'INTERNAL_RETURN', label: '↩️ Trả nội bộ' },
 ];
 
@@ -70,10 +70,20 @@ export default function CreateInboundPage() {
     e.preventDefault();
     const errs: any = {};
     if (!formData.warehouseId) errs.warehouseId = 'Vui lòng chọn kho hàng';
+    if (!formData.expectedDate) errs.expectedDate = 'Vui lòng chọn thời gian dự kiến';
+    if (!formData.supplierType) errs.supplierType = 'Vui lòng chọn loại hình cung ứng';
     if (!formData.supplierName.trim()) errs.supplierName = 'Vui lòng nhập tên nhà cung cấp';
+    if (!formData.supplierPhone.trim()) errs.supplierPhone = 'Vui lòng nhập số điện thoại';
+    if (!formData.supplierEmail.trim()) errs.supplierEmail = 'Vui lòng nhập email';
+    if (!formData.notes.trim()) errs.notes = 'Vui lòng nhập ghi chú';
     formData.items.forEach((item, i) => {
       if (!item.categoryId) errs[`items.${i}.categoryId`] = 'Chọn danh mục';
+      if (!item.brandId) errs[`items.${i}.brandId`] = 'Chọn thương hiệu';
       if (!item.modelName.trim()) errs[`items.${i}.modelName`] = 'Nhập tên model';
+      if (!item.serialNumber.trim()) errs[`items.${i}.serialNumber`] = 'Nhập serial / IMEI';
+      if (!item.condition) errs[`items.${i}.condition`] = 'Chọn hiện trạng';
+      if (!item.estimatedValue || item.estimatedValue <= 0) errs[`items.${i}.estimatedValue`] = 'Nhập giá trị > 0';
+      if (!item.notes.trim()) errs[`items.${i}.notes`] = 'Nhập ghi chú tình trạng';
     });
     if (Object.keys(errs).length > 0) { setErrors(errs); window.scrollTo({ top: 0, behavior: 'smooth' }); return; }
     try {
@@ -182,7 +192,7 @@ export default function CreateInboundPage() {
                 </div>
 
                 <div className="form-field">
-                  <label className="form-label">Thời gian dự kiến (ETA)</label>
+                  <label className="form-label">Thời gian dự kiến <span>*</span></label>
                   <div style={{ position: 'relative' }}>
                     <Calendar size={16} style={{ position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8', pointerEvents: 'none' }} />
                     <input
@@ -190,9 +200,10 @@ export default function CreateInboundPage() {
                       value={formData.expectedDate}
                       onChange={e => setFormData(p => ({ ...p, expectedDate: e.target.value }))}
                       className="form-input"
-                      style={{ paddingLeft: '2.75rem' }}
+                      style={{ paddingLeft: '2.75rem', borderColor: errors.expectedDate ? '#fecdd3' : undefined }}
                     />
                   </div>
+                  {errors.expectedDate && <p style={{ color: '#e11d48', fontSize: '0.75rem', fontWeight: 700 }}>{errors.expectedDate}</p>}
                 </div>
               </div>
             </div>
@@ -234,14 +245,15 @@ export default function CreateInboundPage() {
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                 <div className="form-field">
-                  <label className="form-label">Loại hình cung ứng</label>
+                  <label className="form-label">Loại hình cung ứng <span>*</span></label>
                   <select
                     value={formData.supplierType}
                     onChange={e => setFormData(p => ({ ...p, supplierType: e.target.value as any }))}
-                    className="form-input" style={{ cursor: 'pointer' }}
+                    className="form-input" style={{ cursor: 'pointer', borderColor: errors.supplierType ? '#fecdd3' : undefined }}
                   >
                     {SUPPLIER_TYPES.map(t => <option key={t.val} value={t.val}>{t.label}</option>)}
                   </select>
+                  {errors.supplierType && <p style={{ color: '#e11d48', fontSize: '0.75rem', fontWeight: 700 }}>{errors.supplierType}</p>}
                 </div>
 
                 <div className="form-field">
@@ -261,23 +273,25 @@ export default function CreateInboundPage() {
                 </div>
 
                 <div className="form-field">
-                  <label className="form-label">Số điện thoại</label>
+                  <label className="form-label">Số điện thoại <span>*</span></label>
                   <div style={{ position: 'relative' }}>
                     <Phone size={16} style={{ position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8', pointerEvents: 'none' }} />
                     <input type="tel" value={formData.supplierPhone}
                       onChange={e => setFormData(p => ({ ...p, supplierPhone: e.target.value }))}
-                      className="form-input" style={{ paddingLeft: '2.75rem' }} placeholder="09xx.xxx.xxx" />
+                      className="form-input" style={{ paddingLeft: '2.75rem', borderColor: errors.supplierPhone ? '#fecdd3' : undefined }} placeholder="09xx.xxx.xxx" />
                   </div>
+                  {errors.supplierPhone && <p style={{ color: '#e11d48', fontSize: '0.75rem', fontWeight: 700 }}>{errors.supplierPhone}</p>}
                 </div>
 
                 <div className="form-field">
-                  <label className="form-label">Email</label>
+                  <label className="form-label">Email <span>*</span></label>
                   <div style={{ position: 'relative' }}>
                     <Mail size={16} style={{ position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8', pointerEvents: 'none' }} />
                     <input type="email" value={formData.supplierEmail}
                       onChange={e => setFormData(p => ({ ...p, supplierEmail: e.target.value }))}
-                      className="form-input" style={{ paddingLeft: '2.75rem' }} placeholder="email@domain.com" />
+                      className="form-input" style={{ paddingLeft: '2.75rem', borderColor: errors.supplierEmail ? '#fecdd3' : undefined }} placeholder="email@domain.com" />
                   </div>
+                  {errors.supplierEmail && <p style={{ color: '#e11d48', fontSize: '0.75rem', fontWeight: 700 }}>{errors.supplierEmail}</p>}
                 </div>
               </div>
             </div>
@@ -341,15 +355,16 @@ export default function CreateInboundPage() {
 
                       {/* Brand */}
                       <div className="form-field">
-                        <label className="form-label">Thương hiệu</label>
+                        <label className="form-label">Thương hiệu <span>*</span></label>
                         <select
                           value={item.brandId || ''}
                           onChange={e => updateItem(idx, 'brandId', e.target.value)}
-                          className="form-input" style={{ cursor: 'pointer' }}
+                          className="form-input" style={{ cursor: 'pointer', borderColor: errors[`items.${idx}.brandId`] ? '#fecdd3' : undefined }}
                         >
                           <option value="">-- Thương hiệu --</option>
                           {brands.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
                         </select>
+                        {errors[`items.${idx}.brandId`] && <p style={{ color: '#e11d48', fontSize: '0.6875rem', fontWeight: 700 }}>{errors[`items.${idx}.brandId`]}</p>}
                       </div>
 
                       {/* Model name */}
@@ -368,7 +383,7 @@ export default function CreateInboundPage() {
 
                       {/* Serial */}
                       <div className="form-field">
-                        <label className="form-label">Serial / IMEI</label>
+                        <label className="form-label">Serial / IMEI <span>*</span></label>
                         <div style={{ position: 'relative' }}>
                           <ScanLine size={15} style={{ position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8', pointerEvents: 'none' }} />
                           <input
@@ -376,27 +391,29 @@ export default function CreateInboundPage() {
                             value={item.serialNumber}
                             onChange={e => updateItem(idx, 'serialNumber', e.target.value)}
                             className="form-input"
-                            style={{ paddingLeft: '2.75rem', fontFamily: 'monospace', fontWeight: 900, color: '#4f46e5', fontSize: '0.8125rem' }}
+                            style={{ paddingLeft: '2.75rem', fontFamily: 'monospace', fontWeight: 900, color: '#4f46e5', fontSize: '0.8125rem', borderColor: errors[`items.${idx}.serialNumber`] ? '#fecdd3' : undefined }}
                             placeholder="Scan hoặc nhập tay..."
                           />
                         </div>
+                        {errors[`items.${idx}.serialNumber`] && <p style={{ color: '#e11d48', fontSize: '0.6875rem', fontWeight: 700 }}>{errors[`items.${idx}.serialNumber`]}</p>}
                       </div>
 
                       {/* Condition */}
                       <div className="form-field">
-                        <label className="form-label">Hiện trạng</label>
+                        <label className="form-label">Hiện trạng <span>*</span></label>
                         <select
                           value={item.condition}
                           onChange={e => updateItem(idx, 'condition', e.target.value)}
-                          className="form-input" style={{ cursor: 'pointer' }}
+                          className="form-input" style={{ cursor: 'pointer', borderColor: errors[`items.${idx}.condition`] ? '#fecdd3' : undefined }}
                         >
                           {CONDITION_LEVELS.map(c => <option key={c.val} value={c.val}>{c.label}</option>)}
                         </select>
+                        {errors[`items.${idx}.condition`] && <p style={{ color: '#e11d48', fontSize: '0.6875rem', fontWeight: 700 }}>{errors[`items.${idx}.condition`]}</p>}
                       </div>
 
                       {/* Estimated value */}
                       <div className="form-field">
-                        <label className="form-label">Giá trị ước tính (VNĐ)</label>
+                        <label className="form-label">Giá trị ước tính (VNĐ) <span>*</span></label>
                         <div style={{ position: 'relative' }}>
                           <DollarSign size={15} style={{ position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8', pointerEvents: 'none' }} />
                           <input
@@ -404,24 +421,26 @@ export default function CreateInboundPage() {
                             value={item.estimatedValue || ''}
                             onChange={e => updateItem(idx, 'estimatedValue', Number(e.target.value))}
                             className="form-input"
-                            style={{ paddingLeft: '2.75rem', fontWeight: 900, color: '#16a34a' }}
+                            style={{ paddingLeft: '2.75rem', fontWeight: 900, color: '#16a34a', borderColor: errors[`items.${idx}.estimatedValue`] ? '#fecdd3' : undefined }}
                             placeholder="0"
                           />
                         </div>
+                        {errors[`items.${idx}.estimatedValue`] && <p style={{ color: '#e11d48', fontSize: '0.6875rem', fontWeight: 700 }}>{errors[`items.${idx}.estimatedValue`]}</p>}
                       </div>
                     </div>
 
                     {/* Notes */}
                     <div className="form-field" style={{ marginTop: '0.75rem' }}>
-                      <label className="form-label">Ghi chú tình trạng</label>
+                      <label className="form-label">Ghi chú tình trạng <span>*</span></label>
                       <textarea
                         value={item.notes}
                         onChange={e => updateItem(idx, 'notes', e.target.value)}
                         rows={2}
                         className="form-input"
-                        style={{ resize: 'none' }}
+                        style={{ resize: 'none', borderColor: errors[`items.${idx}.notes`] ? '#fecdd3' : undefined }}
                         placeholder="Mô tả vết trầy, lịch sử sửa chữa..."
                       />
+                      {errors[`items.${idx}.notes`] && <p style={{ color: '#e11d48', fontSize: '0.6875rem', fontWeight: 700 }}>{errors[`items.${idx}.notes`]}</p>}
                     </div>
                   </div>
                 ))}
@@ -442,7 +461,7 @@ export default function CreateInboundPage() {
                 </div>
                 <div>
                   <p style={{ fontWeight: 900, color: '#818cf8', fontSize: '1rem', letterSpacing: '-0.02em' }}>Tóm tắt phiếu</p>
-                  <p style={{ fontSize: '0.5625rem', fontWeight: 900, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.15em' }}>Inbound Summary</p>
+                  <p style={{ fontSize: '0.5625rem', fontWeight: 900, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.15em' }}>Tóm tắt nhập kho</p>
                 </div>
               </div>
 
@@ -496,16 +515,17 @@ export default function CreateInboundPage() {
                 <div style={{ width: '2rem', height: '2rem', background: '#f8fafc', border: '1px solid #f1f5f9', borderRadius: '0.5rem', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#94a3b8' }}>
                   <FileText size={15} />
                 </div>
-                <p style={{ fontSize: '0.625rem', fontWeight: 900, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.15em' }}>Ghi chú nội bộ</p>
+                <p style={{ fontSize: '0.625rem', fontWeight: 900, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.15em' }}>Ghi chú nội bộ *</p>
               </div>
               <textarea
                 className="form-input"
                 rows={4}
                 value={formData.notes}
                 onChange={e => setFormData(p => ({ ...p, notes: e.target.value }))}
-                style={{ resize: 'none' }}
+                style={{ resize: 'none', borderColor: errors.notes ? '#fecdd3' : undefined }}
                 placeholder="Ghi chú cho bộ phận kiểm hàng, thủ kho..."
               />
+              {errors.notes && <p style={{ color: '#e11d48', fontSize: '0.75rem', fontWeight: 700, marginTop: '0.5rem' }}>{errors.notes}</p>}
             </div>
           </div>
 

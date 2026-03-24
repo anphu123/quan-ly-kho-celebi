@@ -22,11 +22,11 @@ const operations = [
   { name: 'Tồn kho tổng hợp', href: '/stock/levels', icon: BarChart3 },
   { name: 'Nhập kho (Inbound)', href: '/inbound', icon: ArrowDownLeft },
   { name: 'Xuất kho (Outbound)', href: '/outbound', icon: FileOutput },
-  { name: 'Trade-in Xiaomi', href: '/trade-in-xiaomi', icon: Smartphone },
+  { name: 'Thu cũ Xiaomi', href: '/trade-in-xiaomi', icon: Smartphone },
 ];
 
 const adminOperations = [
-  { name: 'Admin Ops Panel', href: '/admin-ops', icon: Terminal, adminOnly: true },
+  { name: 'Bảng vận hành quản trị', href: '/admin-ops', icon: Terminal, adminOnly: true },
 ];
 
 export default function MainLayout() {

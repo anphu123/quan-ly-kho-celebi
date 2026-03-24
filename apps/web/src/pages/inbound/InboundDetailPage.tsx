@@ -395,7 +395,7 @@ export default function InboundDetailPage() {
                                 </div>
 
                                 <div className="form-field">
-                                    <label className="form-label">Vị trí đặt (Bin)</label>
+                                    <label className="form-label">Vị trí đặt (ô/kệ)</label>
                                     <input
                                         type="text"
                                         className="form-input"
@@ -406,17 +406,17 @@ export default function InboundDetailPage() {
                                 </div>
 
                                 <div className="form-field">
-                                    <label className="form-label">Phân loại (Grade)</label>
+                                    <label className="form-label">Phân hạng</label>
                                     <select
                                         className="form-input"
                                         style={{ cursor: 'pointer' }}
                                         value={qcFormData.condition}
                                         onChange={e => setQcFormData({ ...qcFormData, condition: e.target.value })}
                                     >
-                                        <option value="Tốt">Grade A — Mới / Rất đẹp</option>
-                                        <option value="Khá">Grade B — Khá / Xước nhẹ</option>
-                                        <option value="Cần sửa chữa">Grade C — Cần sửa chữa</option>
-                                        <option value="Hỏng nặng">Grade D — Hỏng / Lấy linh kiện</option>
+                                        <option value="Tốt">Hạng A — Mới / Rất đẹp</option>
+                                        <option value="Khá">Hạng B — Khá / Xước nhẹ</option>
+                                        <option value="Cần sửa chữa">Hạng C — Cần sửa chữa</option>
+                                        <option value="Hỏng nặng">Hạng D — Hỏng / Lấy linh kiện</option>
                                     </select>
                                 </div>
                             </div>
