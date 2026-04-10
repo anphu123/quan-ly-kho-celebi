@@ -27,16 +27,19 @@ const OutboundPage = lazy(() => import('./pages/outbound/OutboundPage'));
 const CreateOutboundPage = lazy(() => import('./pages/outbound/CreateOutboundPage'));
 const AdminOpsPage = lazy(() => import('./pages/admin/AdminOpsPage'));
 const TradeInXiaomiPage = lazy(() => import('./pages/trade-in/TradeInXiaomiPage'));
+const TradeInProgramsPage = lazy(() => import('./pages/trade-in/TradeInProgramsPage'));
+const TradeInProgramDetailPage = lazy(() => import('./pages/trade-in/TradeInProgramDetailPage'));
 const CreateTradeInPage = lazy(() => import('./pages/trade-in/CreateTradeInPage'));
 const CreateSingleTradeInPage = lazy(() => import('./pages/trade-in/CreateSingleTradeInPage'));
 const TradeInDetailPage = lazy(() => import('./pages/trade-in/TradeInDetailPage'));
 const StockLevelsPage = lazy(() => import('./pages/stock/StockLevelsPage'));
+const UsersPage = lazy(() => import('./pages/users/UsersPage'));
 const CategoriesPage = lazy(() => import('./features/categories/CategoriesPage'));
 const BrandsPage = lazy(() => import('./features/brands/BrandsPage'));
 const CategoryDetailPage = lazy(() => import('./features/categories/CategoryDetailPage'));
 const BrandDetailPage = lazy(() => import('./features/brands/BrandDetailPage'));
 const ProductTemplatesPage = lazy(() => import('./pages/products/ProductTemplatesPage'));
-
+const LogsPage = lazy(() => import('./pages/logs/LogsPage'));
 
 // --- Route Guards ---
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -126,14 +129,34 @@ function App() {
             <Route path="new" element={<CreateOutboundPage />} />
           </Route>
 
-          {/* Trade-in Module */}
+          {/* Trade-in Module (new multi-program routes) */}
+          <Route path="trade-in">
+            <Route index element={<TradeInProgramsPage />} />
+            <Route path="programs/:id" element={<TradeInProgramDetailPage />} />
+            <Route path="programs/:id/create-single" element={<CreateSingleTradeInPage />} />
+            <Route path="create" element={<CreateTradeInPage />} />
+            <Route path="create-single" element={<CreateSingleTradeInPage />} />
+          </Route>
+
+          {/* Backward compat: keep /trade-in-xiaomi fully working */}
           <Route path="trade-in-xiaomi">
             <Route index element={<TradeInXiaomiPage />} />
             <Route path="create" element={<CreateTradeInPage />} />
             <Route path="create-single" element={<CreateSingleTradeInPage />} />
-            {/* <Route path=":id" element={<TradeInDetailPage />} /> */}
             <Route path=":id" element={<TradeInDetailPage />} />
           </Route>
+
+          {/* User & Role Management (SUPER_ADMIN only) */}
+          <Route
+            path="users"
+            element={
+              <SuperAdminRoute>
+                <UsersPage />
+              </SuperAdminRoute>
+            }
+          />
+
+          <Route path="logs" element={<LogsPage />} />
 
           {/* Admin Restricted */}
           <Route

@@ -1,5 +1,5 @@
 // Serial-Based Second-Hand Electronics Management Schema
-// Specialized for IMEI/Serial tracking, QC grading, and asset lifecycle
+// PostgreSQL (Neon) - migrated from MongoDB
 
 generator client {
   provider      = "prisma-client-js"
@@ -7,8 +7,9 @@ generator client {
 }
 
 datasource db {
-  provider = "mongodb"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DATABASE_URL_UNPOOLED")
 }
 
 // ===========================
@@ -25,7 +26,7 @@ enum UserRole {
 }
 
 model User {
-  id       String   @id @default(cuid()) @map("_id")
+  id       String   @id @default(cuid())
   email    String   @unique
   password String
   fullName String
@@ -42,6 +43,8 @@ model User {
   salesOrders        SalesOrder[]
   inboundRequests    InboundRequest[]
   stockMovements     StockMovement[]
+  tradeInPrograms    TradeInProgram[]
+  managedWarehouses  Warehouse[]
 
   @@map("users")
 }
@@ -64,7 +67,7 @@ enum TrackingMethod {
 }
 
 model Category {
-  id             String         @id @default(cuid()) @map("_id")
+  id             String         @id @default(cuid())
   name           String
   code           String         @unique
   productType    ProductType
@@ -88,7 +91,7 @@ model Category {
 }
 
 model Brand {
-  id   String  @id @default(cuid()) @map("_id")
+  id   String  @id @default(cuid())
   name String  @unique
   code String  @unique
   logo String?
@@ -104,7 +107,7 @@ model Brand {
 }
 
 model BrandCategory {
-  id         String   @id @default(cuid()) @map("_id")
+  id         String   @id @default(cuid())
   brandId    String
   categoryId String
   assignedAt DateTime @default(now())
@@ -119,7 +122,7 @@ model BrandCategory {
 }
 
 model ProductTemplate {
-  id          String  @id @default(cuid()) @map("_id")
+  id          String  @id @default(cuid())
   sku         String  @unique
   name        String
   model       String?
@@ -163,7 +166,7 @@ enum AttributeType {
 }
 
 model AttributeGroup {
-  id          String  @id @default(cuid()) @map("_id")
+  id          String  @id @default(cuid())
   categoryId  String
   name        String
   description String?
@@ -179,7 +182,7 @@ model AttributeGroup {
 }
 
 model Attribute {
-  id               String        @id @default(cuid()) @map("_id")
+  id               String        @id @default(cuid())
   attributeGroupId String
   key              String
   name             String
@@ -203,7 +206,7 @@ model Attribute {
 }
 
 model ProductSpec {
-  id                String @id @default(cuid()) @map("_id")
+  id                String @id @default(cuid())
   productTemplateId String
   attributeId       String
   value             Json
@@ -242,7 +245,7 @@ enum Grade {
 }
 
 model SerialItem {
-  id                String @id @default(cuid()) @map("_id")
+  id                String @id @default(cuid())
   productTemplateId String
 
   serialNumber String? @unique
@@ -260,11 +263,12 @@ model SerialItem {
   currentCostPrice Float @default(0)
   suggestedPrice   Float @default(0)
 
-  warehouseId String
-  binLocation String?
+  warehouseId   String
+  binLocationId String?
 
   productTemplate ProductTemplate @relation(fields: [productTemplateId], references: [id])
   warehouse       Warehouse       @relation(fields: [warehouseId], references: [id])
+  binLocation     BinLocation?    @relation(fields: [binLocationId], references: [id])
 
   qcInspections     QCInspection[]
   dynamicSpecs      DynamicSpec[]
@@ -280,7 +284,7 @@ model SerialItem {
 }
 
 model DynamicSpec {
-  id           String   @id @default(cuid()) @map("_id")
+  id           String   @id @default(cuid())
   serialItemId String
   attributeId  String
   value        Json
@@ -290,6 +294,7 @@ model DynamicSpec {
   serialItem SerialItem @relation(fields: [serialItemId], references: [id], onDelete: Cascade)
   attribute  Attribute  @relation(fields: [attributeId], references: [id])
 
+  @@unique([serialItemId, attributeId])
   @@index([serialItemId, attributeId, recordedAt])
   @@map("dynamic_specs")
 }
@@ -299,7 +304,7 @@ model DynamicSpec {
 // ===========================
 
 model QCTemplate {
-  id          String  @id @default(cuid()) @map("_id")
+  id          String  @id @default(cuid())
   categoryId  String
   name        String
   description String?
@@ -324,7 +329,7 @@ enum CheckItemType {
 }
 
 model QCCheckItem {
-  id          String        @id @default(cuid()) @map("_id")
+  id          String        @id @default(cuid())
   templateId  String
   section     String
   item        String
@@ -352,7 +357,7 @@ enum InspectionStatus {
 }
 
 model QCInspection {
-  id           String           @id @default(cuid()) @map("_id")
+  id           String           @id @default(cuid())
   serialItemId String
   templateId   String
   inspectorId  String
@@ -375,7 +380,7 @@ model QCInspection {
 }
 
 model QCInspectionItem {
-  id           String @id @default(cuid()) @map("_id")
+  id           String @id @default(cuid())
   inspectionId String
   checkItemId  String
 
@@ -398,15 +403,18 @@ model QCInspectionItem {
 // ===========================
 
 model Warehouse {
-  id       String  @id @default(cuid()) @map("_id")
-  code     String  @unique
-  name     String
-  address  String?
-  phone    String?
-  isActive Boolean @default(true)
+  id        String  @id @default(cuid())
+  code      String  @unique
+  name      String
+  address   String?
+  phone     String?
+  isActive  Boolean @default(true)
+  managerId String?
 
   totalArea   Float?
   maxCapacity Int?
+
+  manager User? @relation(fields: [managerId], references: [id])
 
   serialItems     SerialItem[]
   binLocations    BinLocation[]
@@ -430,7 +438,7 @@ enum LocationType {
 }
 
 model BinLocation {
-  id          String       @id @default(cuid()) @map("_id")
+  id          String       @id @default(cuid())
   warehouseId String
   code        String
   name        String
@@ -442,7 +450,8 @@ model BinLocation {
   currentItems Int     @default(0)
   isActive     Boolean @default(true)
 
-  warehouse Warehouse @relation(fields: [warehouseId], references: [id])
+  warehouse   Warehouse    @relation(fields: [warehouseId], references: [id])
+  serialItems SerialItem[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -464,7 +473,7 @@ enum RefurbStatus {
 }
 
 model RefurbishmentJob {
-  id           String       @id @default(cuid()) @map("_id")
+  id           String       @id @default(cuid())
   serialItemId String
   technicianId String
   status       RefurbStatus @default(PLANNED)
@@ -490,7 +499,7 @@ model RefurbishmentJob {
 }
 
 model PartUsage {
-  id       String  @id @default(cuid()) @map("_id")
+  id       String  @id @default(cuid())
   jobId    String
   partName String
   quantity Int     @default(1)
@@ -519,7 +528,7 @@ enum TransactionType {
 }
 
 model SerialTransaction {
-  id           String          @id @default(cuid()) @map("_id")
+  id           String          @id @default(cuid())
   serialItemId String
   type         TransactionType
 
@@ -556,7 +565,7 @@ enum SalesOrderStatus {
 }
 
 model Customer {
-  id       String  @id @default(cuid()) @map("_id")
+  id       String  @id @default(cuid())
   code     String  @unique
   fullName String
   phone    String?
@@ -572,7 +581,7 @@ model Customer {
 }
 
 model SalesOrder {
-  id          String           @id @default(cuid()) @map("_id")
+  id          String           @id @default(cuid())
   code        String           @unique
   customerId  String?
   warehouseId String
@@ -596,7 +605,7 @@ model SalesOrder {
 }
 
 model SalesOrderItem {
-  id           String @id @default(cuid()) @map("_id")
+  id           String @id @default(cuid())
   salesOrderId String
   serialItemId String
 
@@ -612,11 +621,36 @@ model SalesOrderItem {
 }
 
 // ===========================
+// CONTACT (unified customer/seller entity)
+// ===========================
+
+model Contact {
+  id               String    @id @default(cuid())
+  fullName         String
+  phone            String?
+  email            String?
+  address          String?
+  idCard           String?
+  idCardIssueDate  DateTime?
+  idCardIssuePlace String?
+  bankAccount      String?
+  bankName         String?
+
+  inboundRequests InboundRequest[]
+  inboundItems    InboundItem[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("contacts")
+}
+
+// ===========================
 // SUPPLIER MANAGEMENT
 // ===========================
 
 model Supplier {
-  id            String  @id @default(cuid()) @map("_id")
+  id            String  @id @default(cuid())
   code          String  @unique
   name          String
   contactPerson String?
@@ -628,10 +662,45 @@ model Supplier {
   notes         String?
   isActive      Boolean @default(true)
 
+  inboundRequests InboundRequest[]
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@map("suppliers")
+}
+
+// ===========================
+// TRADE-IN PROGRAMS
+// ===========================
+
+model TradeInProgram {
+  id          String  @id @default(cuid())
+  code        String  @unique
+  name        String
+  description String?
+  logoUrl     String?
+  isActive    Boolean @default(true)
+
+  startDate DateTime?
+  endDate   DateTime?
+
+  customFields       Json?
+  defaultFieldConfig Json?
+
+  formTemplateId String? @unique
+
+  createdById String?
+
+  createdBy    User?        @relation(fields: [createdById], references: [id])
+  formTemplate FormTemplate? @relation(fields: [formTemplateId], references: [id])
+
+  inboundRequests InboundRequest[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("trade_in_programs")
 }
 
 // ===========================
@@ -640,8 +709,11 @@ model Supplier {
 
 enum InboundStatus {
   REQUESTED
+  PENDING_APPROVAL
   IN_PROGRESS
+  PENDING_WAREHOUSE_ENTRY
   COMPLETED
+  REJECTED
   CANCELLED
 }
 
@@ -653,7 +725,7 @@ enum SupplierType {
 }
 
 model InboundRequest {
-  id           String        @id @default(cuid()) @map("_id")
+  id           String        @id @default(cuid())
   code         String        @unique
   warehouseId  String
   status       InboundStatus @default(REQUESTED)
@@ -662,6 +734,10 @@ model InboundRequest {
   supplierName  String
   supplierPhone String?
   supplierEmail String?
+
+  contactId        String?
+  supplierId       String?
+  tradeInProgramId String?
 
   expectedDate DateTime?
   receivedDate DateTime?
@@ -672,9 +748,12 @@ model InboundRequest {
   notes        String?
   receivedById String?
 
-  warehouse  Warehouse     @relation(fields: [warehouseId], references: [id])
-  receivedBy User?         @relation(fields: [receivedById], references: [id])
-  items      InboundItem[]
+  warehouse      Warehouse       @relation(fields: [warehouseId], references: [id])
+  receivedBy     User?           @relation(fields: [receivedById], references: [id])
+  contact        Contact?        @relation(fields: [contactId], references: [id])
+  supplier       Supplier?       @relation(fields: [supplierId], references: [id])
+  tradeInProgram TradeInProgram? @relation(fields: [tradeInProgramId], references: [id])
+  items          InboundItem[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -684,7 +763,7 @@ model InboundRequest {
 }
 
 model InboundItem {
-  id               String  @id @default(cuid()) @map("_id")
+  id               String  @id @default(cuid())
   inboundRequestId String
 
   productTemplateId String?
@@ -722,13 +801,18 @@ model InboundItem {
   isReceived Boolean   @default(false)
   receivedAt DateTime?
 
-  serialItemId String?
+  serialItemId      String?
+  contactId         String?
+  formSubmissionId  String?
+
+  customData Json?
 
   inboundRequest  InboundRequest   @relation(fields: [inboundRequestId], references: [id], onDelete: Cascade)
   productTemplate ProductTemplate? @relation(fields: [productTemplateId], references: [id])
   category        Category         @relation(fields: [categoryId], references: [id])
   brand           Brand?           @relation(fields: [brandId], references: [id])
   serialItem      SerialItem?      @relation(fields: [serialItemId], references: [id])
+  contact         Contact?         @relation(fields: [contactId], references: [id])
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -738,11 +822,74 @@ model InboundItem {
 }
 
 // ===========================
+// DYNAMIC FORMS SYSTEM
+// ===========================
+
+model FormTemplate {
+  id          String  @id @default(cuid())
+  name        String
+  description String?
+
+  fields      FormField[]
+  submissions FormSubmission[]
+  tradeIn     TradeInProgram?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("form_templates")
+}
+
+model FormField {
+  id         String        @id @default(cuid())
+  templateId String
+  key        String
+  label      String
+  type       AttributeType @default(TEXT)
+  isRequired Boolean       @default(false)
+  isVisible  Boolean       @default(true)
+  sortOrder  Int           @default(0)
+  options    Json?
+
+  template FormTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+
+  @@unique([templateId, key])
+  @@map("form_fields")
+}
+
+model FormSubmission {
+  id            String @id @default(cuid())
+  templateId    String
+  referenceType String
+  referenceId   String
+
+  template FormTemplate     @relation(fields: [templateId], references: [id])
+  values   FormFieldValue[]
+
+  createdAt DateTime @default(now())
+
+  @@index([referenceType, referenceId])
+  @@map("form_submissions")
+}
+
+model FormFieldValue {
+  id           String @id @default(cuid())
+  submissionId String
+  fieldKey     String
+  value        Json
+
+  submission FormSubmission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+
+  @@unique([submissionId, fieldKey])
+  @@map("form_field_values")
+}
+
+// ===========================
 // STOCK LEVEL & MOVEMENT TRACKING
 // ===========================
 
 model StockLevel {
-  id                String @id @default(cuid()) @map("_id")
+  id                String @id @default(cuid())
   productTemplateId String
   warehouseId       String
   grade             Grade?
@@ -756,8 +903,8 @@ model StockLevel {
   damagedQty      Int @default(0)
   returnedQty     Int @default(0)
 
-  averageCost Float
-  totalValue  Float
+  averageCost Float @default(0)
+  totalValue  Float @default(0)
 
   minStockLevel Int @default(5)
   maxStockLevel Int @default(100)
@@ -786,7 +933,7 @@ enum MovementType {
 }
 
 model StockMovement {
-  id                String       @id @default(cuid()) @map("_id")
+  id                String       @id @default(cuid())
   productTemplateId String
   warehouseId       String
 

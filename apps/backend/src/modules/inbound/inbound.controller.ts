@@ -143,24 +143,27 @@ export class InboundController {
   }
 
   @Post('requests/:id/complete-qc')
-  @ApiOperation({ summary: 'Complete QC and create serial items (simplified)' })
-  @ApiResponse({ status: 200, description: 'QC completed and items created' })
+  @ApiOperation({ summary: 'Complete QC. For CUSTOMER_TRADE_IN: moves to PENDING_WAREHOUSE_ENTRY awaiting thủ kho approval. For others: creates serial items immediately.' })
+  @ApiResponse({ status: 200, description: 'QC completed' })
   @ApiParam({ name: 'id', description: 'Inbound request ID' })
   async completeQCSimple(
     @Param('id') id: string,
     @CurrentUser() user: any,
     @Body() body?: { notes?: string },
   ) {
-    // Get the request with items
     const request = await this.inboundService.getInboundRequestById(id);
-    
-    // Auto-generate complete data for all items
+
+    // Trade-in: after QC → submit for warehouse entry approval (thủ kho duyệt nhập kho)
+    if ((request as any).supplierType === 'CUSTOMER_TRADE_IN') {
+      return this.inboundService.submitQCForWarehouseApproval(id);
+    }
+
+    // Regular inbound: complete immediately
     const items = (request as any).items.map((item: any) => {
       const estimatedValue = Number(item.estimatedValue) || 0;
       const otherCosts = Number(item.otherCosts) || 0;
       const topUp = Number(item.topUp) || 0;
       const purchasePrice = Math.max(estimatedValue + otherCosts + topUp, 1000);
-      
       return {
         inboundItemId: item.id,
         serialNumber: item.serialNumber || null,
@@ -171,15 +174,26 @@ export class InboundController {
         customAttributes: [],
       };
     });
-    
+
     const dto: CompleteInboundDto = {
       inboundRequestId: id,
       items,
       notes: body?.notes,
       skipQC: true,
     };
-    
+
     return this.inboundService.completeInboundRequest(dto, user.id);
+  }
+
+  @Post('requests/:id/confirm-entry')
+  @ApiOperation({ summary: 'Thủ kho duyệt nhập kho (PENDING_WAREHOUSE_ENTRY → COMPLETED)' })
+  @ApiResponse({ status: 200, description: 'Warehouse entry confirmed, serial items created' })
+  @ApiParam({ name: 'id', description: 'Inbound request ID' })
+  async confirmWarehouseEntry(
+    @Param('id') id: string,
+    @CurrentUser() user: any,
+  ) {
+    return this.inboundService.confirmWarehouseEntry(id, user.id);
   }
 
   @Post('requests/:id/start-receiving')
@@ -193,6 +207,36 @@ export class InboundController {
     @CurrentUser() user: any,
   ) {
     return this.inboundService.startReceivingProcess(id, user.id);
+  }
+
+  @Post('requests/:id/submit')
+  @ApiOperation({ summary: 'Submit inbound request for approval (REQUESTED → PENDING_APPROVAL)' })
+  @ApiResponse({ status: 200, description: 'Phiếu submitted for approval' })
+  @ApiParam({ name: 'id', description: 'Inbound request ID' })
+  async submitForApproval(@Param('id') id: string) {
+    return this.inboundService.submitForApproval(id);
+  }
+
+  @Post('requests/:id/approve')
+  @ApiOperation({ summary: 'Approve inbound request (PENDING_APPROVAL → IN_PROGRESS) — thủ kho only' })
+  @ApiResponse({ status: 200, description: 'Phiếu approved and moved to IN_PROGRESS' })
+  @ApiParam({ name: 'id', description: 'Inbound request ID' })
+  async approveInbound(
+    @Param('id') id: string,
+    @CurrentUser() user: any,
+  ) {
+    return this.inboundService.approveInbound(id, user.id);
+  }
+
+  @Post('requests/:id/reject')
+  @ApiOperation({ summary: 'Reject inbound request (PENDING_APPROVAL → REJECTED) — thủ kho only' })
+  @ApiResponse({ status: 200, description: 'Phiếu rejected' })
+  @ApiParam({ name: 'id', description: 'Inbound request ID' })
+  async rejectInbound(
+    @Param('id') id: string,
+    @Body() body?: { reason?: string },
+  ) {
+    return this.inboundService.rejectInbound(id, body?.reason);
   }
 
   @Post('complete')
@@ -210,6 +254,13 @@ export class InboundController {
   // ===========================
   // ANALYTICS & REPORTING ENDPOINTS
   // ===========================
+
+  @Get('pending-approvals')
+  @ApiOperation({ summary: 'Get pending approval requests for current user (filtered by managed warehouses)' })
+  @ApiResponse({ status: 200, description: 'Pending approval requests' })
+  async getPendingApprovals(@CurrentUser() user: any) {
+    return this.inboundService.getPendingApprovalsForUser(user.id, user.role);
+  }
 
   @Get('stats')
   @ApiOperation({ summary: 'Get inbound statistics' })

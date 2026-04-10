@@ -5,9 +5,11 @@ import {
   Truck, Users2, LogOut,
   Menu, Bell, Search, Settings2, Cpu, Command,
   MonitorPlay, FileOutput, Receipt, Terminal, Shield, Smartphone,
-  FolderTree, Award, Printer
+  FolderTree, Award, Printer, UserCog, Package, ChevronRight, X, ScrollText
 } from 'lucide-react';
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { inboundApi } from '../api/inbound.api';
 
 const navigation = [
   { name: 'Tổng quan', href: '/dashboard', icon: LayoutGrid },
@@ -26,12 +28,146 @@ const operations = [
   { name: 'Tồn kho tổng hợp', href: '/stock/levels', icon: BarChart3 },
   { name: 'Nhập kho (Inbound)', href: '/inbound', icon: ArrowDownLeft },
   { name: 'Xuất kho (Outbound)', href: '/outbound', icon: FileOutput },
-  { name: 'Thu cũ Xiaomi', href: '/trade-in-xiaomi', icon: Smartphone },
+  { name: 'Thu cũ (Trade-in)', href: '/trade-in', icon: Smartphone },
 ];
 
 const adminOperations = [
-  { name: 'Bảng vận hành quản trị', href: '/admin-ops', icon: Terminal, adminOnly: true },
+  { name: 'Nhật ký hoạt động', href: '/logs', icon: ScrollText },
+  { name: 'Tài khoản & Phân quyền', href: '/users', icon: UserCog },
+  { name: 'Bảng vận hành quản trị', href: '/admin-ops', icon: Terminal },
 ];
+
+function NotificationBell() {
+  const navigate = useNavigate();
+  const { user } = useAuthStore();
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  const canApprove = user?.role === 'SUPER_ADMIN' || user?.role === 'INVENTORY_MANAGER';
+
+  const { data } = useQuery({
+    queryKey: ['pending-approvals'],
+    queryFn: () => inboundApi.getPendingApprovals(),
+    refetchInterval: 30_000,
+    refetchIntervalInBackground: false,
+    enabled: canApprove,
+  });
+
+  const items = data?.data ?? [];
+  const count = items.length;
+
+  // Close on outside click
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
+  return (
+    <div ref={ref} style={{ position: 'relative' }}>
+      <button
+        className="header-icon-btn"
+        onClick={() => setOpen(o => !o)}
+        title={count > 0 ? `${count} phiếu chờ duyệt` : 'Thông báo'}
+        style={{ position: 'relative' }}
+      >
+        <Bell size={18} />
+        {count > 0 && (
+          <span style={{
+            position: 'absolute', top: 4, right: 4,
+            background: '#ef4444', color: '#fff',
+            borderRadius: '99px', fontSize: 10, fontWeight: 800,
+            minWidth: 16, height: 16, display: 'flex', alignItems: 'center', justifyContent: 'center',
+            padding: '0 4px', lineHeight: 1, border: '2px solid #fff',
+          }}>
+            {count > 9 ? '9+' : count}
+          </span>
+        )}
+      </button>
+
+      {open && (
+        <div style={{
+          position: 'absolute', top: 'calc(100% + 8px)', right: 0,
+          width: 340, background: '#fff', borderRadius: 14,
+          boxShadow: '0 8px 32px rgba(0,0,0,.14)', border: '1px solid #e2e8f0',
+          zIndex: 9999, overflow: 'hidden',
+        }}>
+          {/* Header */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', borderBottom: '1px solid #f1f5f9' }}>
+            <span style={{ fontWeight: 800, fontSize: 14, color: '#0f172a' }}>Thông báo</span>
+            <button onClick={() => setOpen(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8', display: 'flex', alignItems: 'center' }}>
+              <X size={14} />
+            </button>
+          </div>
+
+          {/* List */}
+          {count === 0 ? (
+            <div style={{ padding: '32px 16px', textAlign: 'center', color: '#94a3b8', fontSize: 13 }}>
+              Không có thông báo mới
+            </div>
+          ) : (
+            <>
+              <div style={{ padding: '8px 16px 4px', fontSize: 11, fontWeight: 700, color: '#f97316', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                {count} phiếu cần xử lý
+                {user?.managedWarehouses && user.managedWarehouses.length > 0 && (
+                  <span style={{ fontWeight: 400, color: '#94a3b8', textTransform: 'none', marginLeft: 6 }}>
+                    · {user.managedWarehouses.map(w => w.name).join(', ')}
+                  </span>
+                )}
+              </div>
+              <div style={{ maxHeight: 320, overflowY: 'auto' }}>
+                {items.map(req => (
+                  <button
+                    key={req.id}
+                    onClick={() => { navigate(`/inbound/${req.id}`); setOpen(false); }}
+                    style={{
+                      width: '100%', display: 'flex', alignItems: 'center', gap: 10,
+                      padding: '10px 16px', background: 'none', border: 'none', cursor: 'pointer',
+                      textAlign: 'left', borderBottom: '1px solid #f8fafc',
+                      transition: 'background .15s',
+                    }}
+                    onMouseEnter={e => (e.currentTarget.style.background = '#f8fafc')}
+                    onMouseLeave={e => (e.currentTarget.style.background = 'none')}
+                  >
+                    <div style={{ width: 32, height: 32, borderRadius: 8, background: '#fff7ed', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                      <Package size={15} style={{ color: '#f97316' }} />
+                    </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontWeight: 700, fontSize: 13, color: '#0f172a', display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <span>{req.code}</span>
+                        {req.status === 'PENDING_WAREHOUSE_ENTRY'
+                          ? <span style={{ background: '#faf5ff', color: '#7e22ce', borderRadius: 6, fontSize: 10, fontWeight: 700, padding: '1px 6px' }}>CHỜ DUYỆT NHẬP KHO</span>
+                          : <span style={{ background: '#fff7ed', color: '#c2410c', borderRadius: 6, fontSize: 10, fontWeight: 700, padding: '1px 6px' }}>CHỜ DUYỆT</span>
+                        }
+                      </div>
+                      <div style={{ fontSize: 11, color: '#64748b', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {req.supplierName} · {req.warehouse?.name}
+                      </div>
+                      <div style={{ fontSize: 10, color: '#94a3b8', marginTop: 1 }}>
+                        {new Date(req.createdAt).toLocaleString('vi-VN', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
+                      </div>
+                    </div>
+                    <ChevronRight size={13} style={{ color: '#cbd5e1', flexShrink: 0 }} />
+                  </button>
+                ))}
+              </div>
+              <div style={{ padding: '8px 16px', borderTop: '1px solid #f1f5f9' }}>
+                <button
+                  onClick={() => { navigate('/inbound'); setOpen(false); }}
+                  style={{ width: '100%', padding: '8px', borderRadius: 8, border: '1.5px solid #e2e8f0', background: '#fff', fontSize: 12, fontWeight: 700, color: '#6366f1', cursor: 'pointer' }}
+                >
+                  Xem tất cả phiếu chờ duyệt
+                </button>
+              </div>
+            </>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function MainLayout() {
   const { user, logout } = useAuthStore();
@@ -178,10 +314,7 @@ export default function MainLayout() {
           </div>
 
           <div className="app-header-right">
-            <button className="header-icon-btn">
-              <Bell size={18} />
-              <span className="header-notification-dot" />
-            </button>
+            <NotificationBell />
             <button className="header-icon-btn">
               <Settings2 size={18} />
             </button>

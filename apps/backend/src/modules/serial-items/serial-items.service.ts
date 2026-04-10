@@ -57,6 +57,7 @@ export class SerialItemsService {
             },
           },
           warehouse: true,
+          binLocation: { select: { id: true, name: true, code: true } },
           qcInspections: {
             orderBy: { startedAt: 'desc' },
             take: 1,
@@ -325,9 +326,10 @@ export class SerialItemsService {
     const finalInternalCode = internalCode || await this.generateInternalCode(productTemplate.sku);
 
     // Create serial item
+    const { binLocation: _bl, ...createDtoClean } = createDto as any;
     const serialItem = await this.prisma.serialItem.create({
       data: {
-        ...createDto,
+        ...createDtoClean,
         internalCode: finalInternalCode,
         status: 'INCOMING',
         currentCostPrice: createDto.purchasePrice,
@@ -382,9 +384,9 @@ export class SerialItemsService {
       }
     }
 
+    const { binLocation: _bl2, ...updateDtoClean } = updateDto as any;
     const updateData = {
-      ...updateDto,
-      // Add audit note for tracking
+      ...updateDtoClean,
       notes: updateDto.notes || `Updated by user ${userId}`,
     };
 
@@ -420,14 +422,13 @@ export class SerialItemsService {
     }
 
     const oldStatus = item.status;
-    const oldLocation = item.binLocation;
+    const oldLocation = item.binLocationId || item.warehouseId;
 
     // Update the item
     const updatedItem = await this.prisma.serialItem.update({
       where: { id },
       data: {
         status,
-        ...(binLocation && { binLocation }),
       },
       include: {
         productTemplate: true,
@@ -503,7 +504,7 @@ export class SerialItemsService {
     id: string,
     userId: string,
     warehouseId?: string,
-    binLocation?: string
+    _binLocation?: string
   ) {
     const item = await this.prisma.serialItem.findUnique({
       where: { id },
@@ -523,13 +524,12 @@ export class SerialItemsService {
       }
     }
 
-    const oldLocation = `${item.warehouse.name} - ${item.binLocation || 'N/A'}`;
-    
+    const oldLocation = `${item.warehouse.name} - ${item.binLocationId || 'N/A'}`;
+
     const updatedItem = await this.prisma.serialItem.update({
       where: { id },
       data: {
         ...(warehouseId && { warehouseId }),
-        ...(binLocation !== undefined && { binLocation }),
       },
       include: {
         warehouse: true,
@@ -537,7 +537,7 @@ export class SerialItemsService {
       },
     });
 
-    const newLocation = `${updatedItem.warehouse.name} - ${updatedItem.binLocation || 'N/A'}`;
+    const newLocation = `${updatedItem.warehouse.name} - ${updatedItem.binLocationId || 'N/A'}`;
 
     // Create transaction record
     await this.prisma.serialTransaction.create({

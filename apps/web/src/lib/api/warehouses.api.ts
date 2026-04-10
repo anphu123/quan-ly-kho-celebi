@@ -7,6 +7,13 @@ export interface Warehouse {
   address?: string;
   phone?: string;
   isActive: boolean;
+  managerId?: string;
+  manager?: {
+    id: string;
+    fullName: string;
+    email: string;
+    role: string;
+  };
   createdAt: string;
   updatedAt: string;
 }
@@ -22,10 +29,10 @@ export interface WarehousesResponse {
 }
 
 export interface CreateWarehouseDto {
-  code: string;
   name: string;
   address?: string;
   phone?: string;
+  managerId?: string;
 }
 
 export interface UpdateWarehouseDto extends Partial<CreateWarehouseDto> {}

@@ -6,7 +6,7 @@ import {
     User, DollarSign, Image as ImageIcon,
     Loader2, AlertTriangle, ChevronRight, X, ZoomIn
 } from 'lucide-react';
-import { inventoryApi, STATUS_LABELS, type SerialStatus } from '../../lib/api/inventory.api';
+import { inventoryApi, STATUS_LABELS, type SerialStatus, IN_STOCK_STATUSES } from '../../lib/api/inventory.api';
 import { resolveImageUrl } from '../../lib/image';
 
 const GRADE_LABELS: Record<string, string> = {
@@ -103,6 +103,9 @@ export default function InventoryItemDetailPage() {
 
     const statusStyle = STATUS_COLORS[item.status as SerialStatus] || { bg: '#f1f5f9', color: '#475569' };
 
+    const daysInStock = Math.floor((new Date().getTime() - new Date(item.createdAt).getTime()) / (1000 * 60 * 60 * 24));
+    const isOver30Days = daysInStock >= 30 && IN_STOCK_STATUSES.includes(item.status as SerialStatus);
+
     return (
         <div className="animate-fade-in" style={{ maxWidth: 960, margin: '0 auto' }}>
             {/* Back */}
@@ -134,6 +137,11 @@ export default function InventoryItemDetailPage() {
                                 <span style={{ fontFamily: 'monospace', fontSize: 13, color: '#6366f1', fontWeight: 700 }}>S/N: {item.serialNumber}</span>
                             )}
                             <span style={{ fontFamily: 'monospace', fontSize: 13, color: '#94a3b8' }}>Mã NB: {item.internalCode}</span>
+                            {isOver30Days && (
+                                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '2px 8px', borderRadius: 6, background: '#fee2e2', color: '#e11d48', fontSize: 13, fontWeight: 700 }}>
+                                    <AlertTriangle size={13} /> Lưu kho {daysInStock} ngày
+                                </span>
+                            )}
                         </div>
                     </div>
                     <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
@@ -156,7 +164,7 @@ export default function InventoryItemDetailPage() {
                 {/* Thông tin cơ bản */}
                 <Card title="Thông tin thiết bị" icon={<Package size={16} />}>
                     <InfoRow label="Kho" value={item.warehouse?.name} />
-                    <InfoRow label="Vị trí (ô/kệ)" value={item.binLocation} />
+                    <InfoRow label="Vị trí (ô/kệ)" value={item.binLocation?.name} />
                     <InfoRow label="Nguồn nhập" value={item.source} />
                     <InfoRow label="Lô nhập" value={item.purchaseBatch} />
                     <InfoRow label="Ngày nhập" value={fmtDate(item.purchaseDate)} />

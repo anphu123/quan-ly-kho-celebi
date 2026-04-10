@@ -13,6 +13,9 @@ import { StockModule } from './modules/stock/stock.module';
 import { UploadModule } from './modules/upload/upload.module';
 import { AttributesModule } from './modules/attributes/attributes.module';
 import { OutboundModule } from './modules/outbound/outbound.module';
+import { TradeInProgramsModule } from './modules/trade-in-programs/trade-in-programs.module';
+import { UsersModule } from './modules/users/users.module';
+import { LogsModule } from './modules/logs/logs.module';
 
 @Module({
   imports: [
@@ -43,7 +46,10 @@ import { OutboundModule } from './modules/outbound/outbound.module';
     StockModule, // ⭐ Stock Level & Movement Tracking
     UploadModule, // ⭐ File uploads
     AttributesModule, // ⭐ EAV Attribute Groups & Attributes
-    OutboundModule,   // ⭐ Outbound / Sales operations
+    OutboundModule,         // ⭐ Outbound / Sales operations
+    TradeInProgramsModule,  // ⭐ Trade-in Programs management
+    UsersModule,            // ⭐ User & Role management
+    LogsModule,             // 📋 Activity logs
   ],
 })
 export class AppModule { }

@@ -304,7 +304,7 @@ export default function WarehouseDetailPage() {
                                                 </span>
                                             </td>
                                             <td style={{ padding: '0.875rem 1rem', fontSize: '0.8125rem', color: '#475569' }}>
-                                                {item.binLocation || <span style={{ color: '#cbd5e1' }}>—</span>}
+                                                {item.binLocation?.name || <span style={{ color: '#cbd5e1' }}>—</span>}
                                             </td>
                                             <td style={{ padding: '0.875rem 1rem', fontWeight: 800, color: '#059669', fontSize: '0.875rem', whiteSpace: 'nowrap' }}>
                                                 {formatCurrency(item.currentCostPrice || 0)}
@@ -410,7 +410,7 @@ function SerialItemModal({ item, onClose, formatCurrency }: { item: any; onClose
 
                     {/* Logistics section */}
                     <p style={{ fontSize: '0.7rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '0.5rem', marginTop: '1rem' }}>Lưu kho</p>
-                    <Row icon={MapPin} label="Vị trí bin" value={item.binLocation} />
+                    <Row icon={MapPin} label="Vị trí bin" value={item.binLocation?.name} />
                     <Row icon={Calendar} label="Ngày nhập" value={item.purchaseDate ? new Date(item.purchaseDate).toLocaleDateString('vi-VN') : null} />
                     <Row icon={Tag} label="Lô hàng" value={item.purchaseBatch} />
                     <Row icon={Info} label="Nguồn" value={item.source} />

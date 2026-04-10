@@ -10,35 +10,25 @@ const getApiUrl = () => {
   // Automatically replace localhost with actual LAN IP if accessed via network
   if (envUrl && (envUrl.includes('localhost') || envUrl.includes('127.0.0.1'))) {
     if (hostname !== 'localhost' && hostname !== '127.0.0.1') {
-      const url = envUrl.replace(/localhost|127\.0\.0\.1/, hostname);
-      console.log('🌐 API URL (LAN Override):', url);
-      return url;
+      return envUrl.replace(/localhost|127\.0\.0\.1/, hostname);
     }
   }
 
   // Use env variable if explicitly set
-  if (envUrl) {
-    console.log('🔧 Using API URL from env:', envUrl);
-    return envUrl;
-  }
+  if (envUrl) return envUrl;
 
   // Fallback: same origin (backend served on same domain via Vercel functions)
   // For local dev with port, check if running on localhost
   if (hostname === 'localhost' || hostname === '127.0.0.1') {
-    const url = `http://${hostname}:6868/api/v1`;
-    console.log('🌐 API URL (Local Fallback):', url);
-    return url;
+    return `http://${hostname}:6868/api/v1`;
   }
 
   // Production: API is served on the same domain
   const protocol = window.location.protocol;
-  const url = `${protocol}//${hostname}/api/v1`;
-  console.log('🌐 API URL (Same-Origin Fallback):', url);
-  return url;
+  return `${protocol}//${hostname}/api/v1`;
 };
 
 const API_URL = getApiUrl();
-console.log('✅ Final API Base URL:', API_URL);
 
 export const api = axios.create({
   baseURL: API_URL,

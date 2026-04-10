@@ -8,7 +8,7 @@ export interface InboundRequest {
   id: string;
   code: string;
   warehouseId: string;
-  status: 'REQUESTED' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED';
+  status: 'REQUESTED' | 'PENDING_APPROVAL' | 'IN_PROGRESS' | 'PENDING_WAREHOUSE_ENTRY' | 'COMPLETED' | 'CANCELLED' | 'REJECTED';
   supplierType: 'CUSTOMER_TRADE_IN' | 'INTERNAL_RETURN' | 'LIQUIDATION' | 'INDIVIDUAL_SELLER';
   supplierName: string;
   supplierPhone?: string;
@@ -19,6 +19,8 @@ export interface InboundRequest {
   totalActualValue?: number;
   notes?: string;
   receivedById?: string;
+  tradeInProgramId?: string;
+  tradeInProgram?: { id: string; code: string; name: string };
 
   warehouse: {
     id: string;
@@ -67,6 +69,7 @@ export interface InboundItem {
   deviceImages?: string;   // JSON array string
   cccdFrontUrl?: string;
   cccdBackUrl?: string;
+  customData?: string;
 
   isReceived: boolean;
   receivedAt?: string;
@@ -107,6 +110,7 @@ export interface CreateInboundRequest {
   expectedDate?: string;
   totalEstimatedValue?: number;
   notes?: string;
+  tradeInProgramId?: string;
   items: CreateInboundItem[];
 }
 
@@ -137,6 +141,7 @@ export interface CreateInboundItem {
   deviceImages?: string;
   cccdFrontUrl?: string;
   cccdBackUrl?: string;
+  customData?: string;
 }
 
 export interface ReceiveItem {
@@ -170,6 +175,7 @@ export interface InboundQuery {
   supplierType?: 'CUSTOMER_TRADE_IN' | 'INTERNAL_RETURN' | 'LIQUIDATION' | 'INDIVIDUAL_SELLER';
   warehouseId?: string;
   search?: string;
+  tradeInProgramId?: string;
   page?: number;
   limit?: number;
 }
@@ -205,6 +211,7 @@ export const inboundApi = {
     if (query?.supplierType) params.append('supplierType', query.supplierType);
     if (query?.warehouseId) params.append('warehouseId', query.warehouseId);
     if (query?.search) params.append('search', query.search);
+    if (query?.tradeInProgramId) params.append('tradeInProgramId', query.tradeInProgramId);
     if (query?.page) params.append('page', query.page.toString());
     if (query?.limit) params.append('limit', query.limit.toString());
 
@@ -237,6 +244,31 @@ export const inboundApi = {
 
   async receiveItems(requestId: string): Promise<InboundRequest> {
     return this.startReceiving(requestId);
+  },
+
+  async confirmWarehouseEntry(requestId: string): Promise<InboundRequest> {
+    const response = await api.post(`/inbound/requests/${requestId}/confirm-entry`);
+    return response.data;
+  },
+
+  async getPendingApprovals(): Promise<{ data: InboundRequest[]; total: number }> {
+    const response = await api.get('/inbound/pending-approvals');
+    return response.data;
+  },
+
+  async submitForApproval(requestId: string): Promise<InboundRequest> {
+    const response = await api.post(`/inbound/requests/${requestId}/submit`);
+    return response.data;
+  },
+
+  async approveInbound(requestId: string): Promise<InboundRequest> {
+    const response = await api.post(`/inbound/requests/${requestId}/approve`);
+    return response.data;
+  },
+
+  async rejectInbound(requestId: string, reason?: string): Promise<InboundRequest> {
+    const response = await api.post(`/inbound/requests/${requestId}/reject`, { reason });
+    return response.data;
   },
 
   async completeInbound(data: CompleteInbound): Promise<InboundRequest> {
@@ -308,9 +340,12 @@ export const inboundApi = {
   getStatusColor(status: string): string {
     const colors = {
       REQUESTED: 'bg-blue-100 text-blue-800',
+      PENDING_APPROVAL: 'bg-orange-100 text-orange-800',
       IN_PROGRESS: 'bg-yellow-100 text-yellow-800',
+      PENDING_WAREHOUSE_ENTRY: 'bg-purple-100 text-purple-800',
       COMPLETED: 'bg-green-100 text-green-800',
       CANCELLED: 'bg-red-100 text-red-800',
+      REJECTED: 'bg-red-100 text-red-800',
     };
     return colors[status as keyof typeof colors] || 'bg-gray-100 text-gray-800';
   },
@@ -318,9 +353,12 @@ export const inboundApi = {
   getStatusBadge(status: string): string {
     const badges = {
       REQUESTED: '📥 Yêu cầu',
-      IN_PROGRESS: '⏳ Đang nhận',
+      PENDING_APPROVAL: '⏳ Chờ duyệt',
+      IN_PROGRESS: '🔄 Đang nhận',
+      PENDING_WAREHOUSE_ENTRY: '📦 Chờ duyệt nhập kho',
       COMPLETED: '✅ Hoàn thành',
       CANCELLED: '❌ Hủy bỏ',
+      REJECTED: '🚫 Từ chối',
     };
     return badges[status as keyof typeof badges] || status;
   },

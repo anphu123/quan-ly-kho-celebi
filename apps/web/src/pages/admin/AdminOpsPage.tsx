@@ -27,7 +27,6 @@ const getApiBaseUrl = () => {
 };
 
 const API_BASE = getApiBaseUrl();
-  console.log('⚙️ API quản trị:', API_BASE);
 
 export default function AdminOpsPage() {
   const queryClient = useQueryClient();

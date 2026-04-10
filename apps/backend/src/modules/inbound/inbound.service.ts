@@ -96,7 +96,20 @@ export class InboundService {
       }
     }
 
-    // Create inbound request with items (userId can be used for audit trails later)
+    // Tạo Contact cho supplier nếu là INDIVIDUAL_SELLER / CUSTOMER_TRADE_IN
+    let requestContactId: string | null = null;
+    if (dto.supplierName && ['INDIVIDUAL_SELLER', 'CUSTOMER_TRADE_IN'].includes(dto.supplierType)) {
+      const contact = await this.prisma.contact.create({
+        data: {
+          fullName: dto.supplierName,
+          phone: dto.supplierPhone,
+          email: dto.supplierEmail,
+        },
+      });
+      requestContactId = contact.id;
+    }
+
+    // Create inbound request with items
     return this.prisma.inboundRequest.create({
       data: {
         code,
@@ -105,38 +118,44 @@ export class InboundService {
         supplierName: dto.supplierName,
         supplierPhone: dto.supplierPhone,
         supplierEmail: dto.supplierEmail,
+        contactId: requestContactId,
         expectedDate: dto.expectedDate ? new Date(dto.expectedDate) : null,
         totalEstimatedValue: dto.totalEstimatedValue,
         notes: dto.notes,
+        tradeInProgramId: dto.tradeInProgramId,
         items: {
-          create: dto.items.map(item => ({
-            productTemplateId: item.productTemplateId,
-            categoryId: item.categoryId,
-            brandId: item.brandId,
-            serialNumber: item.serialNumber,
-            modelName: item.modelName,
-            condition: item.condition,
-            estimatedValue: item.estimatedValue,
-            notes: item.notes,
-            sourceCustomerName: item.sourceCustomerName,
-            sourceCustomerPhone: item.sourceCustomerPhone,
-            sourceCustomerAddress: item.sourceCustomerAddress,
-            sourceCustomerIdCard: item.sourceCustomerIdCard,
-            idCardIssueDate: item.idCardIssueDate ? new Date(item.idCardIssueDate) : null,
-            idCardIssuePlace: item.idCardIssuePlace,
-            bankAccount: item.bankAccount,
-            bankName: item.bankName,
-            contractNumber: item.contractNumber,
-            purchaseDate: item.purchaseDate ? new Date(item.purchaseDate) : null,
-            employeeName: item.employeeName,
-            otherCosts: item.otherCosts,
-            topUp: item.topUp,
-            repairCost: item.repairCost,
-            imageUrl: item.imageUrl,
-            deviceImages: item.deviceImages,
-            cccdFrontUrl: item.cccdFrontUrl,
-            cccdBackUrl: item.cccdBackUrl,
-          })),
+          create: dto.items.map(item => {
+            // Tạo contactId từ flat fields cho mỗi item (reuse request contact nếu cùng người)
+            return {
+              productTemplateId: item.productTemplateId,
+              categoryId: item.categoryId,
+              brandId: item.brandId,
+              serialNumber: item.serialNumber,
+              modelName: item.modelName,
+              condition: item.condition,
+              estimatedValue: item.estimatedValue,
+              notes: item.notes,
+              // Flat fields (backward compat)
+              sourceCustomerName: item.sourceCustomerName,
+              sourceCustomerPhone: item.sourceCustomerPhone,
+              sourceCustomerAddress: item.sourceCustomerAddress,
+              sourceCustomerIdCard: item.sourceCustomerIdCard,
+              idCardIssueDate: item.idCardIssueDate ? new Date(item.idCardIssueDate) : null,
+              idCardIssuePlace: item.idCardIssuePlace,
+              bankAccount: item.bankAccount,
+              bankName: item.bankName,
+              contractNumber: item.contractNumber,
+              purchaseDate: item.purchaseDate ? new Date(item.purchaseDate) : null,
+              employeeName: item.employeeName,
+              otherCosts: item.otherCosts,
+              topUp: item.topUp,
+              repairCost: item.repairCost,
+              imageUrl: item.imageUrl,
+              deviceImages: item.deviceImages,
+              cccdFrontUrl: item.cccdFrontUrl,
+              cccdBackUrl: item.cccdBackUrl,
+            };
+          }),
         },
       },
       include: {
@@ -153,7 +172,7 @@ export class InboundService {
   }
 
   async getAllInboundRequests(query: InboundQueryDto) {
-    const { status, supplierType, warehouseId, search, page = 1, limit = 20 } = query;
+    const { status, supplierType, warehouseId, search, tradeInProgramId, page = 1, limit = 20 } = query;
     const skip = (page - 1) * limit;
 
     const where: any = {};
@@ -161,6 +180,7 @@ export class InboundService {
     if (status) where.status = status;
     if (supplierType) where.supplierType = supplierType;
     if (warehouseId) where.warehouseId = warehouseId;
+    if (tradeInProgramId) where.tradeInProgramId = tradeInProgramId;
     if (search) {
       where.OR = [
         { code: { contains: search, mode: 'insensitive' } },
@@ -188,6 +208,7 @@ export class InboundService {
         where,
         include: {
           warehouse: true,
+          tradeInProgram: { select: { id: true, code: true, name: true } },
           receivedBy: { select: { id: true, fullName: true, email: true } },
           items: {
             include: {
@@ -219,6 +240,7 @@ export class InboundService {
       where: { id },
       include: {
         warehouse: true,
+        tradeInProgram: { select: { id: true, code: true, name: true } },
         receivedBy: { select: { id: true, fullName: true, email: true } },
         items: {
           include: {
@@ -276,8 +298,8 @@ export class InboundService {
       throw new NotFoundException('Inbound request not found');
     }
 
-    if (request.status !== InboundStatus.REQUESTED) {
-      throw new BadRequestException('Cannot delete inbound request that is not in REQUESTED status');
+    if (!([InboundStatus.REQUESTED, InboundStatus.REJECTED] as InboundStatus[]).includes(request.status as InboundStatus)) {
+      throw new BadRequestException('Cannot delete inbound request that is not in REQUESTED or REJECTED status');
     }
 
     // Check if any items have been received
@@ -362,8 +384,8 @@ export class InboundService {
       throw new NotFoundException('Inbound request not found');
     }
 
-    if (request.status !== InboundStatus.REQUESTED) {
-      throw new BadRequestException('Inbound request is not in REQUESTED status');
+    if (!([InboundStatus.REQUESTED, InboundStatus.PENDING_APPROVAL] as InboundStatus[]).includes(request.status as InboundStatus)) {
+      throw new BadRequestException('Inbound request must be in REQUESTED or PENDING_APPROVAL status');
     }
 
     return this.prisma.inboundRequest.update({
@@ -382,6 +404,100 @@ export class InboundService {
         },
       },
     });
+  }
+
+  async submitForApproval(requestId: string) {
+    const request = await this.prisma.inboundRequest.findUnique({ where: { id: requestId } });
+    if (!request) throw new NotFoundException('Inbound request not found');
+    if (request.status !== InboundStatus.REQUESTED) {
+      throw new BadRequestException('Only REQUESTED phiếu can be submitted for approval');
+    }
+    return this.prisma.inboundRequest.update({
+      where: { id: requestId },
+      data: { status: InboundStatus.PENDING_APPROVAL },
+      include: { warehouse: true, items: { include: { category: true, brand: true } } },
+    });
+  }
+
+  async approveInbound(requestId: string, userId: string) {
+    const request = await this.prisma.inboundRequest.findUnique({ where: { id: requestId } });
+    if (!request) throw new NotFoundException('Inbound request not found');
+    if (request.status !== InboundStatus.PENDING_APPROVAL) {
+      throw new BadRequestException('Only PENDING_APPROVAL phiếu can be approved');
+    }
+    return this.prisma.inboundRequest.update({
+      where: { id: requestId },
+      data: { status: InboundStatus.IN_PROGRESS, receivedById: userId },
+      include: { warehouse: true, items: { include: { category: true, brand: true } } },
+    });
+  }
+
+  async rejectInbound(requestId: string, reason?: string) {
+    const request = await this.prisma.inboundRequest.findUnique({ where: { id: requestId } });
+    if (!request) throw new NotFoundException('Inbound request not found');
+    if (!([InboundStatus.PENDING_APPROVAL, InboundStatus.PENDING_WAREHOUSE_ENTRY] as InboundStatus[]).includes(request.status as InboundStatus)) {
+      throw new BadRequestException('Only PENDING_APPROVAL or PENDING_WAREHOUSE_ENTRY phiếu can be rejected');
+    }
+    return this.prisma.inboundRequest.update({
+      where: { id: requestId },
+      data: {
+        status: InboundStatus.REJECTED,
+        ...(reason ? { notes: reason } : {}),
+      },
+      include: { warehouse: true, items: { include: { category: true, brand: true } } },
+    });
+  }
+
+  async submitQCForWarehouseApproval(requestId: string) {
+    const request = await this.prisma.inboundRequest.findUnique({ where: { id: requestId } });
+    if (!request) throw new NotFoundException('Inbound request not found');
+    if (request.status !== InboundStatus.IN_PROGRESS) {
+      throw new BadRequestException('Phiếu phải ở trạng thái IN_PROGRESS để gửi duyệt nhập kho');
+    }
+    return this.prisma.inboundRequest.update({
+      where: { id: requestId },
+      data: { status: InboundStatus.PENDING_WAREHOUSE_ENTRY },
+      include: { warehouse: true, items: { include: { category: true, brand: true } } },
+    });
+  }
+
+  async confirmWarehouseEntry(requestId: string, userId: string) {
+    const request = await this.prisma.inboundRequest.findUnique({
+      where: { id: requestId },
+      include: { items: true },
+    });
+    if (!request) throw new NotFoundException('Inbound request not found');
+    if (request.status !== InboundStatus.PENDING_WAREHOUSE_ENTRY) {
+      throw new BadRequestException('Phiếu phải ở trạng thái PENDING_WAREHOUSE_ENTRY');
+    }
+
+    // Temporarily set to IN_PROGRESS so completeInboundRequest validation passes
+    await this.prisma.inboundRequest.update({
+      where: { id: requestId },
+      data: { status: InboundStatus.IN_PROGRESS },
+    });
+
+    // Build CompleteInboundDto from stored item data
+    const items = request.items.map((item: any) => {
+      const estimatedValue = Number(item.estimatedValue) || 0;
+      const otherCosts = Number(item.otherCosts) || 0;
+      const topUp = Number(item.topUp) || 0;
+      const purchasePrice = Math.max(estimatedValue + otherCosts + topUp, 1000);
+      return {
+        inboundItemId: item.id,
+        serialNumber: item.serialNumber || null,
+        condition: item.condition || item.notes || 'Đã kiểm tra',
+        purchasePrice: Math.round(purchasePrice * 100) / 100,
+        binLocationId: null,
+        notes: item.notes || null,
+        customAttributes: [],
+      };
+    });
+
+    return this.completeInboundRequest(
+      { inboundRequestId: requestId, items, skipQC: true },
+      userId,
+    );
   }
 
   async completeInboundRequest(dto: CompleteInboundDto, userId: string) {
@@ -488,7 +604,7 @@ export class InboundService {
               conditionNotes: receiveItem.condition || inboundItem.condition,
               currentCostPrice: Number(receiveItem.purchasePrice),
               warehouseId: request.warehouseId,
-              binLocation: receiveItem.binLocation || null,
+              binLocationId: null,
             },
           });
 
@@ -805,6 +921,44 @@ export class InboundService {
     return template.id;
   }
 
+
+  // ===========================
+  // ===========================
+  // PENDING APPROVALS FOR USER
+  // ===========================
+
+  async getPendingApprovalsForUser(userId: string, userRole: string) {
+    let warehouseFilter: any = {};
+
+    if (userRole === 'SUPER_ADMIN') {
+      // Admin sees all
+      warehouseFilter = {};
+    } else if (userRole === 'INVENTORY_MANAGER') {
+      // Thủ kho chỉ thấy kho mình quản lý
+      const managedWarehouses = await this.prisma.warehouse.findMany({
+        where: { managerId: userId, isActive: true },
+        select: { id: true },
+      });
+      if (managedWarehouses.length === 0) return { data: [], total: 0 };
+      warehouseFilter = { warehouseId: { in: managedWarehouses.map(w => w.id) } };
+    } else {
+      return { data: [], total: 0 };
+    }
+
+    const items = await this.prisma.inboundRequest.findMany({
+      where: {
+        status: { in: [InboundStatus.PENDING_APPROVAL, InboundStatus.PENDING_WAREHOUSE_ENTRY] },
+        ...warehouseFilter,
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 30,
+      include: {
+        warehouse: { select: { id: true, name: true, code: true } },
+      },
+    });
+
+    return { data: items, total: items.length };
+  }
 
   // ===========================
   // ANALYTICS & REPORTING

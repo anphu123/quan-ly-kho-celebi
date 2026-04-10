@@ -16,7 +16,11 @@ import { resolveImageUrl } from '../../lib/image';
 const fmt = (n?: number) => n != null ? n.toLocaleString('vi-VN') : '—';
 const statusBadge = (status: string) => {
     if (status === 'COMPLETED') return <span style={badgeStyle('#dcfce7', '#166534')}><BadgeCheck size={11} /> ĐÃ NHẬP KHO</span>;
-    if (status === 'IN_PROGRESS') return <span style={badgeStyle('#fef9c3', '#854d0e')}><ClipboardCheck size={11} /> CHỜ QC</span>;
+    if (status === 'IN_PROGRESS') return <span style={badgeStyle('#fef9c3', '#854d0e')}><ClipboardCheck size={11} /> ĐANG NHẬN</span>;
+    if (status === 'PENDING_APPROVAL') return <span style={badgeStyle('#fff7ed', '#c2410c')}><Clock size={11} /> CHỜ DUYỆT</span>;
+    if (status === 'PENDING_WAREHOUSE_ENTRY') return <span style={badgeStyle('#faf5ff', '#7e22ce')}><Package size={11} /> CHỜ DUYỆT NHẬP KHO</span>;
+    if (status === 'REJECTED') return <span style={badgeStyle('#fef2f2', '#b91c1c')}><Clock size={11} /> TỪ CHỐI</span>;
+    if (status === 'CANCELLED') return <span style={badgeStyle('#f1f5f9', '#475569')}><Clock size={11} /> ĐÃ HỦY</span>;
     return <span style={badgeStyle('#eff6ff', '#1d4ed8')}><Clock size={11} /> CHỜ NHẬN HÀNG</span>;
 };
 const badgeStyle = (bg: string, color: string): React.CSSProperties => ({
@@ -232,13 +236,6 @@ export default function InboundPage() {
     const [dateTo, setDateTo] = useState('');
     const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
 
-    const receiveItemsMutation = useMutation({
-        mutationFn: (requestId: string) => inboundApi.receiveItems(requestId),
-        onMutate: (requestId) => setActionLoadingId(requestId),
-        onSettled: () => setActionLoadingId(null),
-        onSuccess: () => queryClient.invalidateQueries({ queryKey: ['inbound-requests'] }),
-        onError: (err: any) => alert('Lỗi nhận hàng: ' + (err.response?.data?.message || err.message)),
-    });
 
     const completeQCMutation = useMutation({
         mutationFn: (requestId: string) => inboundApi.completeQC(requestId),
@@ -246,6 +243,43 @@ export default function InboundPage() {
         onSettled: () => setActionLoadingId(null),
         onSuccess: () => queryClient.invalidateQueries({ queryKey: ['inbound-requests'] }),
         onError: (err: any) => alert('Lỗi nhập kho: ' + (err.response?.data?.message || err.message)),
+    });
+
+    const invalidateAll = () => {
+        queryClient.invalidateQueries({ queryKey: ['inbound-requests'] });
+        queryClient.invalidateQueries({ queryKey: ['pending-approvals'] });
+    };
+
+    const submitForApprovalMutation = useMutation({
+        mutationFn: (requestId: string) => inboundApi.submitForApproval(requestId),
+        onMutate: (requestId) => setActionLoadingId(requestId),
+        onSettled: () => setActionLoadingId(null),
+        onSuccess: invalidateAll,
+        onError: (err: any) => alert('Lỗi gửi duyệt: ' + (err.response?.data?.message || err.message)),
+    });
+
+    const approveInboundMutation = useMutation({
+        mutationFn: (requestId: string) => inboundApi.approveInbound(requestId),
+        onMutate: (requestId) => setActionLoadingId(requestId),
+        onSettled: () => setActionLoadingId(null),
+        onSuccess: invalidateAll,
+        onError: (err: any) => alert('Lỗi duyệt phiếu: ' + (err.response?.data?.message || err.message)),
+    });
+
+    const rejectInboundMutation = useMutation({
+        mutationFn: ({ id, reason }: { id: string; reason?: string }) => inboundApi.rejectInbound(id, reason),
+        onMutate: ({ id }) => setActionLoadingId(id),
+        onSettled: () => setActionLoadingId(null),
+        onSuccess: invalidateAll,
+        onError: (err: any) => alert('Lỗi từ chối phiếu: ' + (err.response?.data?.message || err.message)),
+    });
+
+    const confirmWarehouseEntryMutation = useMutation({
+        mutationFn: (requestId: string) => inboundApi.confirmWarehouseEntry(requestId),
+        onMutate: (requestId) => setActionLoadingId(requestId),
+        onSettled: () => setActionLoadingId(null),
+        onSuccess: invalidateAll,
+        onError: (err: any) => alert('Lỗi duyệt nhập kho: ' + (err.response?.data?.message || err.message)),
     });
     const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
 
@@ -404,8 +438,11 @@ export default function InboundPage() {
                                     style={{ height: 38, paddingLeft: 12, paddingRight: 30, borderRadius: 9, border: '1.5px solid #e2e8f0', fontSize: 13, color: '#0f172a', cursor: 'pointer', background: '#fff', appearance: 'none', outline: 'none' }}>
                                     <option value="">Tất cả TT</option>
                                     <option value="REQUESTED">Chưa nhận</option>
-                                    <option value="IN_PROGRESS">Đang QC</option>
+                                    <option value="PENDING_APPROVAL">Chờ duyệt</option>
+                                    <option value="IN_PROGRESS">Đang nhận</option>
+                                    <option value="PENDING_WAREHOUSE_ENTRY">Chờ duyệt nhập kho</option>
                                     <option value="COMPLETED">Hoàn tất</option>
+                                    <option value="REJECTED">Từ chối</option>
                                 </select>
                                 <ChevronRight size={12} style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%) rotate(90deg)', color: '#94a3b8', pointerEvents: 'none' }} />
                             </div>
@@ -658,23 +695,61 @@ export default function InboundPage() {
                                                 <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
                                                     {request.status === 'REQUESTED' && (
                                                         <button
-                                                            onClick={() => receiveItemsMutation.mutate(request.id)}
+                                                            onClick={() => submitForApprovalMutation.mutate(request.id)}
                                                             disabled={isLoading}
-                                                            title="Xác nhận đã nhận hàng"
-                                                            style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '5px 10px', borderRadius: 7, border: 'none', background: 'linear-gradient(135deg,#3b82f6,#2563eb)', color: '#fff', fontSize: 11, fontWeight: 700, cursor: isLoading ? 'wait' : 'pointer', opacity: isLoading ? 0.7 : 1 }}>
+                                                            title="Gửi phiếu lên thủ kho duyệt"
+                                                            style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '5px 10px', borderRadius: 7, border: 'none', background: 'linear-gradient(135deg,#f97316,#ea580c)', color: '#fff', fontSize: 11, fontWeight: 700, cursor: isLoading ? 'wait' : 'pointer', opacity: isLoading ? 0.7 : 1 }}>
                                                             {isLoading ? <Loader2 size={12} style={{ animation: 'spin 1s linear infinite' }} /> : <Package size={12} />}
-                                                            Nhận hàng
+                                                            Gửi duyệt
                                                         </button>
+                                                    )}
+                                                    {request.status === 'PENDING_APPROVAL' && (
+                                                        <>
+                                                            <button
+                                                                onClick={() => approveInboundMutation.mutate(request.id)}
+                                                                disabled={isLoading}
+                                                                title="Duyệt phiếu nhập kho"
+                                                                style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '5px 10px', borderRadius: 7, border: 'none', background: 'linear-gradient(135deg,#3b82f6,#2563eb)', color: '#fff', fontSize: 11, fontWeight: 700, cursor: isLoading ? 'wait' : 'pointer', opacity: isLoading ? 0.7 : 1 }}>
+                                                                {isLoading ? <Loader2 size={12} style={{ animation: 'spin 1s linear infinite' }} /> : <ClipboardCheck size={12} />}
+                                                                Duyệt
+                                                            </button>
+                                                            <button
+                                                                onClick={() => { const reason = window.prompt('Lý do từ chối (tùy chọn):') ?? undefined; rejectInboundMutation.mutate({ id: request.id, reason: reason || undefined }); }}
+                                                                disabled={isLoading}
+                                                                title="Từ chối phiếu"
+                                                                style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '5px 10px', borderRadius: 7, border: '1px solid #fecaca', background: '#fef2f2', color: '#b91c1c', fontSize: 11, fontWeight: 700, cursor: isLoading ? 'wait' : 'pointer' } as React.CSSProperties}>
+                                                                Từ chối
+                                                            </button>
+                                                        </>
                                                     )}
                                                     {request.status === 'IN_PROGRESS' && (
                                                         <button
                                                             onClick={() => completeQCMutation.mutate(request.id)}
                                                             disabled={isLoading}
-                                                            title="Hoàn tất QC và nhập kho"
+                                                            title="Hoàn tất QC — gửi duyệt nhập kho"
                                                             style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '5px 10px', borderRadius: 7, border: 'none', background: 'linear-gradient(135deg,#10b981,#059669)', color: '#fff', fontSize: 11, fontWeight: 700, cursor: isLoading ? 'wait' : 'pointer', opacity: isLoading ? 0.7 : 1 }}>
                                                             {isLoading ? <Loader2 size={12} style={{ animation: 'spin 1s linear infinite' }} /> : <ClipboardCheck size={12} />}
-                                                            Nhập kho
+                                                            Gửi duyệt nhập kho
                                                         </button>
+                                                    )}
+                                                    {request.status === 'PENDING_WAREHOUSE_ENTRY' && (
+                                                        <>
+                                                            <button
+                                                                onClick={() => confirmWarehouseEntryMutation.mutate(request.id)}
+                                                                disabled={isLoading}
+                                                                title="Duyệt nhập kho — tạo serial items"
+                                                                style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '5px 10px', borderRadius: 7, border: 'none', background: 'linear-gradient(135deg,#7c3aed,#6d28d9)', color: '#fff', fontSize: 11, fontWeight: 700, cursor: isLoading ? 'wait' : 'pointer', opacity: isLoading ? 0.7 : 1 }}>
+                                                                {isLoading ? <Loader2 size={12} style={{ animation: 'spin 1s linear infinite' }} /> : <Package size={12} />}
+                                                                Duyệt nhập kho
+                                                            </button>
+                                                            <button
+                                                                onClick={() => { const reason = window.prompt('Lý do từ chối (tùy chọn):') ?? undefined; rejectInboundMutation.mutate({ id: request.id, reason: reason || undefined }); }}
+                                                                disabled={isLoading}
+                                                                title="Từ chối nhập kho"
+                                                                style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '5px 10px', borderRadius: 7, border: '1px solid #fecaca', background: '#fef2f2', color: '#b91c1c', fontSize: 11, fontWeight: 700, cursor: isLoading ? 'wait' : 'pointer' } as React.CSSProperties}>
+                                                                Từ chối
+                                                            </button>
+                                                        </>
                                                     )}
                                                     <button onClick={() => setEditingItem(item)} title="Chỉnh sửa"
                                                         style={{ width: 30, height: 30, borderRadius: 7, background: '#f0f4ff', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#6366f1' }}>

@@ -97,7 +97,7 @@ export class OutboundService {
                         type: TransactionType.RESERVED,
                         fromStatus: SerialStatus.AVAILABLE,
                         toStatus: SerialStatus.RESERVED,
-                        fromLocation: serialItem.binLocation,
+                        fromLocation: serialItem.binLocationId,
                         notes: `Reserved for outbound ${code} - ${type} - ${requestItem.notes || ''}`,
                         performedById: userId,
                     },
@@ -311,7 +311,7 @@ export class OutboundService {
                         type: transactionType,
                         fromStatus: SerialStatus.AVAILABLE,
                         toStatus: nextStatus,
-                        fromLocation: dbItem.binLocation,
+                        fromLocation: dbItem.binLocationId,
                         notes: `Direct outbound ${outboundCode} - ${dto.type} - ${dto.notes || ''} - ${reqItem.notes || ''}`.trim(),
                         costChange: dto.type === 'DISPOSAL' ? -Number(dbItem.currentCostPrice || 0) : 0,
                         performedById: userId,
@@ -444,7 +444,7 @@ export class OutboundService {
                 internalCode: tx.serialItem.internalCode,
                 product: tx.serialItem.productTemplate.name,
                 brand: tx.serialItem.productTemplate.brand?.name,
-                binLocation: tx.serialItem.binLocation,
+                binLocation: tx.serialItem.binLocationId,
             });
         }
 

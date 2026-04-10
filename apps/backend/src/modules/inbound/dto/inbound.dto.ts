@@ -140,6 +140,11 @@ export class CreateInboundItemDto {
   @IsOptional()
   @IsString()
   cccdBackUrl?: string;
+
+  @ApiPropertyOptional({ description: 'JSON string of custom program field values' })
+  @IsOptional()
+  @IsString()
+  customData?: string;
 }
 
 // ===========================// INBOUND REQUEST DTOs
@@ -185,6 +190,11 @@ export class CreateInboundRequestDto {
   @IsOptional()
   @IsString()
   notes?: string;
+
+  @ApiPropertyOptional({ description: 'Trade-in program ID' })
+  @IsOptional()
+  @IsString()
+  tradeInProgramId?: string;
 
   @ApiProperty({ type: [CreateInboundItemDto], description: 'Items to receive' })
   @IsArray()
@@ -375,6 +385,11 @@ export class UpdateInboundItemDto {
   @IsOptional()
   @IsString()
   cccdBackUrl?: string;
+
+  @ApiPropertyOptional({ description: 'JSON string of custom program field values' })
+  @IsOptional()
+  @IsString()
+  customData?: string;
 }
 
 // ===========================
@@ -484,6 +499,11 @@ export class InboundQueryDto {
   @IsOptional()
   @IsString()
   search?: string; // Search in supplier name, code, notes
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  tradeInProgramId?: string;
 
   @ApiPropertyOptional({ default: 1 })
   @IsOptional()

@@ -7,6 +7,7 @@ export interface User {
   email: string;
   fullName: string;
   role: string;
+  managedWarehouses?: { id: string; name: string; code: string }[];
 }
 
 interface AuthState {

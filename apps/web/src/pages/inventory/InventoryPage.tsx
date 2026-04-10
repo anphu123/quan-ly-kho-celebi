@@ -188,7 +188,11 @@ export default function InventoryPage() {
                     </div>
                   </td>
                 </tr>
-              ) : filteredItems.map((item) => (
+              ) : filteredItems.map((item) => {
+                const daysInStock = Math.floor((new Date().getTime() - new Date(item.createdAt).getTime()) / (1000 * 60 * 60 * 24));
+                const isOver30Days = daysInStock >= 30 && IN_STOCK_STATUSES.includes(item.status as SerialStatus);
+
+                return (
                 <tr key={item.id} onClick={() => navigate(`/inventory/${item.id}`)} style={{ cursor: 'pointer' }}>
                   <td>
                     <span style={{ fontWeight: 700, color: '#0f172a', display: 'block' }}>
@@ -204,9 +208,14 @@ export default function InventoryPage() {
                         {item.serialNumber}
                       </span>
                     ) : null}
-                    <span style={{ fontFamily: 'monospace', fontSize: '0.75rem', color: '#64748b' }}>
+                    <span style={{ fontFamily: 'monospace', fontSize: '0.75rem', color: '#64748b', display: 'block' }}>
                       {item.internalCode}
                     </span>
+                    {isOver30Days && (
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '3px 8px', borderRadius: 6, background: '#fee2e2', color: '#e11d48', fontSize: '0.7rem', fontWeight: 700, marginTop: '0.375rem' }}>
+                         <AlertTriangle size={10} /> Lưu kho {daysInStock} ngày
+                      </span>
+                    )}
                   </td>
                   <td>
                     <span style={{ fontWeight: 600, color: '#0f172a', display: 'block' }}>
@@ -214,7 +223,7 @@ export default function InventoryPage() {
                     </span>
                     {item.binLocation && (
                       <span style={{ fontFamily: 'monospace', fontSize: '0.75rem', color: '#94a3b8' }}>
-                        {item.binLocation}
+                        {item.binLocation.name}
                       </span>
                     )}
                   </td>
@@ -243,7 +252,7 @@ export default function InventoryPage() {
                     </button>
                   </td>
                 </tr>
-              ))}
+              )})}
             </tbody>
           </table>
         </div>
@@ -269,7 +278,7 @@ function StatusModal({ item, onClose, onSuccess }: { item: SerialItem; onClose: 
   const [formData, setFormData] = useState({
     status: item.status as SerialStatus,
     notes: '',
-    binLocation: item.binLocation || '',
+    binLocation: item.binLocation?.name || '',
   });
 
   const mutation = useMutation({

@@ -11,6 +11,7 @@ import { warehousesApi } from '../../lib/api/warehouses.api';
 import { suppliersApi } from '../../lib/api/suppliers.api';
 import { categoriesApi, brandsApi } from '../../lib/api/masterdata.api';
 import { inboundApi } from '../../api/inbound.api';
+import { tradeInProgramsApi } from '../../api/trade-in-programs.api';
 import type { CreateInboundItem } from '../../api/inbound.api';
 
 const parseExcelDate = (excelDate: any) => {
@@ -30,6 +31,7 @@ export default function CreateTradeInPage() {
     const navigate = useNavigate();
     const [warehouseId, setWarehouseId] = useState('');
     const [supplierId, setSupplierId] = useState('');
+    const [tradeInProgramId, setTradeInProgramId] = useState('');
     const [categoryId, setCategoryId] = useState('');
     const [brandId, setBrandId] = useState('');
     const [items, setItems] = useState<CreateInboundItem[]>([]);
@@ -51,6 +53,8 @@ export default function CreateTradeInPage() {
         queryFn: () => warehousesApi.getAll({ limit: 100 })
     });
     const warehouses = warehousesData?.data || [];
+
+    const { data: programs = [] } = useQuery({ queryKey: ['trade-in-programs'], queryFn: tradeInProgramsApi.getAll });
 
     const { data: categoriesData } = useQuery({
         queryKey: ['categories'],
@@ -82,7 +86,8 @@ export default function CreateTradeInPage() {
                 warehouseId,
                 supplierType: 'CUSTOMER_TRADE_IN',
                 supplierName: supplier?.name || 'Cửa hàng chưa xác định',
-                notes: 'Thu cũ Xiaomi từ cửa hàng',
+                notes: 'Thu cũ từ cửa hàng',
+                tradeInProgramId: tradeInProgramId || undefined,
                 items: items.map(item => ({
                     ...item,
                     brandId: brandId || undefined,
@@ -90,7 +95,7 @@ export default function CreateTradeInPage() {
                 }))
             });
         },
-        onSuccess: () => navigate('/trade-in-xiaomi'),
+        onSuccess: () => navigate(tradeInProgramId ? `/trade-in/programs/${tradeInProgramId}` : '/trade-in'),
         onError: (err: any) => setError(err.response?.data?.message || 'Có lỗi xảy ra khi tạo lô hàng')
     });
 
@@ -223,7 +228,21 @@ export default function CreateTradeInPage() {
                             <p style={{ margin: 0, fontSize: 12, color: '#94a3b8' }}>Chọn cửa hàng gửi hàng và kho nhận</p>
                         </div>
                     </div>
-                    <div style={{ padding: '20px 24px', display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
+                    <div style={{ padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: 16 }}>
+                        {/* Program selector */}
+                        <div>
+                            <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 700, color: '#374151', marginBottom: 8 }}>
+                                Chương trình thu cũ
+                            </label>
+                            <select value={tradeInProgramId} onChange={e => setTradeInProgramId(e.target.value)}
+                                style={{ width: '100%', height: 42, borderRadius: 10, border: '1.5px solid #e2e8f0', fontSize: 13, paddingLeft: 12, paddingRight: 32, background: '#fff', outline: 'none', color: '#0f172a', appearance: 'none' }}>
+                                <option value="">— Không gắn chương trình —</option>
+                                {(programs as any[]).filter(p => p.isActive).map((p: any) => (
+                                    <option key={p.id} value={p.id}>{p.name} ({p.code})</option>
+                                ))}
+                            </select>
+                        </div>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
                         <div>
                             <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 700, color: '#374151', marginBottom: 8 }}>
                                 <Building2 size={14} color="#6366f1" /> Cửa hàng gửi hàng <span style={{ color: '#ef4444' }}>*</span>
@@ -265,7 +284,8 @@ export default function CreateTradeInPage() {
                                 {brandOptions.map((b: any) => <option key={b.id} value={b.id}>{b.name}</option>)}
                             </select>
                         </div>
-                    </div>
+                        </div>{/* end inner grid */}
+                    </div>{/* end outer flex */}
                 </div>
 
                 {/* ── Step 2: Tải lên Excel ── */}

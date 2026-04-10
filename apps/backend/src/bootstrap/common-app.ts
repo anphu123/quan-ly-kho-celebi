@@ -33,17 +33,40 @@ export function configureCommonApp(app: INestApplication, configService: ConfigS
 export function setupSwagger(app: NestExpressApplication) {
   const config = new DocumentBuilder()
     .setTitle('CELEBI Inventory & POS API')
-    .setDescription('API Documentation for CELEBI Inventory Management System')
-    .setVersion('1.0')
+    .setDescription(`
+## CELEBI Warehouse Management System
+
+Hệ thống quản lý kho hàng điện tử cũ — Serial-based tracking, QC grading, Trade-in programs.
+
+### Auth
+Dùng JWT Bearer token. Lấy token qua \`POST /api/v1/auth/login\`.
+    `)
+    .setVersion('2.0')
     .addBearerAuth()
-    .addTag('auth', 'Authentication & Authorization')
-    .addTag('users', 'User Management')
-    .addTag('products', 'Product Catalog')
-    .addTag('inventory', 'Inventory Operations')
-    .addTag('sales', 'Sales & POS')
-    .addTag('purchasing', 'Purchasing & Goods Receipt')
-    .addTag('finance', 'Finance & Accounting')
-    .addTag('reports', 'Reports & Dashboard')
+    // Identity & Auth
+    .addTag('auth', 'Đăng nhập / đăng ký / refresh token')
+    .addTag('users', 'Quản lý người dùng & phân quyền')
+    // Master data
+    .addTag('Categories', 'Danh mục sản phẩm')
+    .addTag('Brands', 'Thương hiệu')
+    .addTag('Product Templates', 'Mẫu sản phẩm (template)')
+    .addTag('Suppliers', 'Nhà cung cấp')
+    .addTag('Customers', 'Khách hàng')
+    .addTag('Warehouses', 'Kho hàng')
+    .addTag('attributes', 'Thuộc tính động (EAV)')
+    // Operations
+    .addTag('inbound', 'Nhập kho / Thu cũ')
+    .addTag('serial-items', 'Quản lý serial / IMEI')
+    .addTag('qc-inspections', 'Kiểm định QC')
+    .addTag('stock', 'Tồn kho & xuất nhập')
+    .addTag('outbound', 'Xuất kho')
+    .addTag('trade-in-programs', 'Chương trình thu cũ')
+    // Sales
+    .addTag('pos', 'Bán hàng (POS)')
+    .addTag('sales', 'Đơn hàng bán')
+    // Utilities
+    .addTag('uploads', 'Upload file / ảnh')
+    .addTag('Inventory', 'Inventory helpers')
     .build();
 
   const document = SwaggerModule.createDocument(app, config);

@@ -1,4 +1,4 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { Injectable, UnauthorizedException, ConflictException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '@/prisma/prisma.service';
@@ -59,7 +59,7 @@ export class AuthService {
     });
 
     if (existingUser) {
-      throw new UnauthorizedException('Email already registered');
+      throw new ConflictException('Email already registered');
     }
 
     // Hash password
@@ -119,6 +119,10 @@ export class AuthService {
         isActive: true,
         lastLoginAt: true,
         createdAt: true,
+        managedWarehouses: {
+          select: { id: true, name: true, code: true },
+          where: { isActive: true },
+        },
       },
     });
 

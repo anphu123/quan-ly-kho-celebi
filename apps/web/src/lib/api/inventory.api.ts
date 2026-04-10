@@ -36,7 +36,8 @@ export interface SerialItem {
   currentCostPrice: number;
   suggestedPrice: number;
   warehouseId: string;
-  binLocation: string | null;
+  binLocationId: string | null;
+  binLocation: { id: string; name: string; code: string } | null;
   productTemplate: {
     id: string;
     name: string;

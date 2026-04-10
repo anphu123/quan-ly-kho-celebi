@@ -165,7 +165,7 @@ export default function LoginPage() {
             <button
               type="button"
               className="login-quick-btn"
-              onClick={() => { setEmail("admin@celebi.com"); setPassword("Admin@123"); }}
+              onClick={() => { setEmail("admin@celebi.com"); setPassword("123456"); }}
             >
               <span className="login-quick-icon"><ShieldCheck size={18} /></span>
               <span className="login-quick-label">Siêu quản trị</span>

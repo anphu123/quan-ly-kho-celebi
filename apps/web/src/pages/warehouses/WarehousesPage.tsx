@@ -4,10 +4,11 @@ import { useNavigate } from 'react-router-dom';
 import {
   Plus, Warehouse as WarehouseIcon, Search, Edit, Trash2, X, Loader2,
   MapPin, Phone, ChevronRight, Zap, Target, Globe, Navigation,
-  Package, BarChart3, TrendingUp, Activity, Settings, Copy
+  Package, BarChart3, TrendingUp, Activity, Settings, Copy, UserCog
 } from 'lucide-react';
 import { warehousesApi, type Warehouse, type CreateWarehouseDto } from '../../lib/api/warehouses.api';
 import { inventoryApi } from '../../lib/api/inventory.api';
+import { usersApi } from '../../api/users.api';
 
 export default function WarehousesPage() {
   const queryClient = useQueryClient();
@@ -156,6 +157,14 @@ export default function WarehousesPage() {
                       <Phone size={15} style={{ color: '#94a3b8', flexShrink: 0 }} />
                       <p style={{ fontSize: '0.875rem', fontWeight: 700, color: '#0f172a' }}>{warehouse.phone || 'Chưa có số điện thoại'}</p>
                     </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.625rem' }}>
+                      <UserCog size={15} style={{ color: '#94a3b8', flexShrink: 0 }} />
+                      {warehouse.manager ? (
+                        <span style={{ fontSize: '0.875rem', fontWeight: 700, color: '#4f46e5' }}>{warehouse.manager.fullName}</span>
+                      ) : (
+                        <span style={{ fontSize: '0.875rem', color: '#cbd5e1', fontStyle: 'italic' }}>Chưa có thủ kho</span>
+                      )}
+                    </div>
                   </div>
 
                   {/* Inventory Stats */}
@@ -279,11 +288,23 @@ export default function WarehousesPage() {
 
 function WarehouseModal({ warehouse, onClose, onSuccess }: any) {
   const [formData, setFormData] = useState<CreateWarehouseDto>({
-    code: warehouse?.code || '', name: warehouse?.name || '',
-    address: warehouse?.address || '', phone: warehouse?.phone || ''
+    name: warehouse?.name || '',
+    address: warehouse?.address || '',
+    phone: warehouse?.phone || '',
+    managerId: warehouse?.managerId || '',
   });
+
+  const { data: users = [] } = useQuery({
+    queryKey: ['users'],
+    queryFn: usersApi.getAll,
+  });
+  const managers = users.filter((u: any) => u.isActive && (u.role === 'INVENTORY_MANAGER' || u.role === 'SUPER_ADMIN'));
+
   const mutation = useMutation({
-    mutationFn: (data: CreateWarehouseDto) => warehouse ? warehousesApi.update(warehouse.id, data) : warehousesApi.create(data),
+    mutationFn: (data: CreateWarehouseDto) => {
+      const payload = { ...data, managerId: data.managerId || undefined };
+      return warehouse ? warehousesApi.update(warehouse.id, payload) : warehousesApi.create(payload);
+    },
     onSuccess
   });
   const handleChange = (e: any) => setFormData(prev => ({ ...prev, [e.target.name]: e.target.value }));
@@ -303,15 +324,9 @@ function WarehouseModal({ warehouse, onClose, onSuccess }: any) {
         </div>
 
         <div className="modal-body">
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', marginBottom: '1.25rem' }}>
-            <div className="form-field" style={{ marginBottom: 0 }}>
-              <label className="form-label">Mã kho <span>*</span></label>
-              <input type="text" name="code" value={formData.code} onChange={handleChange} required className="form-input" style={{ textTransform: 'uppercase' }} placeholder="KHO-01" />
-            </div>
-            <div className="form-field" style={{ marginBottom: 0 }}>
-              <label className="form-label">Tên kho <span>*</span></label>
-              <input type="text" name="name" value={formData.name} onChange={handleChange} required className="form-input" placeholder="Warehouse HCM 01" />
-            </div>
+          <div className="form-field">
+            <label className="form-label">Tên kho <span>*</span></label>
+            <input type="text" name="name" value={formData.name} onChange={handleChange} required className="form-input" placeholder="Kho Trung Tâm HCM" />
           </div>
           <div className="form-field">
             <label className="form-label">Địa chỉ</label>
@@ -326,6 +341,21 @@ function WarehouseModal({ warehouse, onClose, onSuccess }: any) {
               <Phone size={16} style={{ position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8', pointerEvents: 'none' }} />
               <input type="text" name="phone" value={formData.phone} onChange={handleChange} className="form-input" style={{ paddingLeft: '2.75rem' }} placeholder="Hotline kho..." />
             </div>
+          </div>
+          <div className="form-field">
+            <label className="form-label">
+              <UserCog size={13} style={{ display: 'inline', marginRight: 4 }} />
+              Thủ kho phụ trách
+            </label>
+            <select name="managerId" value={formData.managerId || ''} onChange={handleChange} className="form-input">
+              <option value="">— Chưa chỉ định —</option>
+              {managers.map((u: any) => (
+                <option key={u.id} value={u.id}>{u.fullName} ({u.email})</option>
+              ))}
+            </select>
+            {managers.length === 0 && (
+              <p style={{ fontSize: 12, color: '#f59e0b', marginTop: 4 }}>Chưa có tài khoản Thủ kho. Tạo tài khoản với vai trò "Thủ kho" trước.</p>
+            )}
           </div>
           {mutation.isError && (
             <div className="error-box">

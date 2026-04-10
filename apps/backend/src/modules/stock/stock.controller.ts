@@ -1,8 +1,11 @@
 import { Controller, Get, Query, Param, Post, UseGuards } from '@nestjs/common';
+import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import { StockService } from './stock.service';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { Grade } from '@prisma/client';
 
+@ApiTags('stock')
+@ApiBearerAuth()
 @Controller('stock')
 @UseGuards(JwtAuthGuard)
 export class StockController {

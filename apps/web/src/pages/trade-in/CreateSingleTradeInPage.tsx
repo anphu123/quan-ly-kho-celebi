@@ -1,5 +1,5 @@
 import React, { useState, useRef, useMemo, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import {
     ArrowLeft, Save, AlertCircle, Smartphone, Building2,
@@ -11,6 +11,7 @@ import { suppliersApi } from '../../lib/api/suppliers.api';
 import { categoriesApi, brandsApi, productTemplatesApi, type ProductTemplate } from '../../lib/api/masterdata.api';
 import { attributesApi, type AttributeGroup } from '../../api/attributes.api';
 import { inboundApi } from '../../api/inbound.api';
+import { tradeInProgramsApi } from '../../api/trade-in-programs.api';
 import { uploadApi } from '../../api/upload.api';
 import type { CreateInboundItem } from '../../api/inbound.api';
 
@@ -141,8 +142,18 @@ const Field = ({ label, icon, col = 1, children }: { label: string; icon?: React
     </div>
 );
 
+const STANDARD_FIELDS_MAP: Record<string, string> = {
+    sourceCustomerName: 'Tên KH', sourceCustomerPhone: 'Số điện thoại', sourceCustomerAddress: 'Địa chỉ KH', sourceCustomerIdCard: 'Số CCCD',
+    idCardIssueDate: 'Ngày cấp CCCD', idCardIssuePlace: 'Nơi cấp CCCD', bankAccount: 'Số TK NH', bankName: 'Tên NH',
+    contractNumber: 'Số hợp đồng', employeeName: 'Tên NV thu', purchaseDate: 'Ngày mua', otherCosts: 'Chi phí khác',
+    topUp: 'Bù thêm', repairCost: 'Giá sửa chữa', serialNumber: 'Serial / IMEI', notes: 'Loại test máy', estimatedValue: 'Giá thu mua',
+    cccdFront: 'Mặt trước CCCD', cccdBack: 'Mặt sau CCCD',
+};
+
 export default function CreateSingleTradeInPage() {
     const navigate = useNavigate();
+    const { id: routeProgramId } = useParams<{ id?: string }>();
+    const [tradeInProgramId, setTradeInProgramId] = useState(routeProgramId || '');
     const [warehouseId, setWarehouseId] = useState('');
     const [supplierId, setSupplierId] = useState('');
     const [error, setError] = useState<string | null>(null);
@@ -173,6 +184,8 @@ export default function CreateSingleTradeInPage() {
     const [showSuggestions, setShowSuggestions] = useState(false);
     const suggestRef = useRef<HTMLDivElement>(null);
 
+    const [programCustomValues, setProgramCustomValues] = useState<Record<string, any>>({});
+
     const { data: suppliersData } = useQuery({ queryKey: ['suppliers'], queryFn: () => suppliersApi.getAll({ limit: 100 }) });
     const suppliers = suppliersData?.data || [];
     const xiaomiSuppliers = suppliers.filter((s: any) =>
@@ -182,6 +195,26 @@ export default function CreateSingleTradeInPage() {
 
     const { data: warehousesData } = useQuery({ queryKey: ['warehouses'], queryFn: () => warehousesApi.getAll({ limit: 100 }) });
     const warehouses = warehousesData?.data || [];
+
+    const { data: programs = [] } = useQuery({ queryKey: ['trade-in-programs'], queryFn: tradeInProgramsApi.getAll });
+    const activeProgram = programs.find((p: any) => p.id === tradeInProgramId);
+    const programCustomFields: any[] = activeProgram?.customFields || [];
+    let defaultFieldConfig: Record<string, any> = {};
+    if (activeProgram?.defaultFieldConfig) {
+        defaultFieldConfig = typeof activeProgram.defaultFieldConfig === 'string' 
+            ? JSON.parse(activeProgram.defaultFieldConfig) 
+            : activeProgram.defaultFieldConfig;
+    }
+
+    const FieldWithConfig = ({ fieldKey, defaultLabel, icon, col = 1, children }: any) => {
+        const conf = defaultFieldConfig[fieldKey] || { visible: true, required: false };
+        if (!conf.visible) return null;
+        return (
+            <Field label={`${defaultLabel}${conf.required ? ' *' : ''}`} icon={icon} col={col}>
+                {children}
+            </Field>
+        );
+    };
 
     const { data: categoriesData } = useQuery({ queryKey: ['categories'], queryFn: () => categoriesApi.getAll() });
     const categories = categoriesData || [];
@@ -323,6 +356,7 @@ export default function CreateSingleTradeInPage() {
                 supplierType: 'CUSTOMER_TRADE_IN',
                 supplierName: supplier?.name || 'Cửa hàng chưa xác định',
                 notes: 'Thu cũ 1 máy lẻ từ cửa hàng',
+                tradeInProgramId: tradeInProgramId || undefined,
                 items: [{
                     ...(item as CreateInboundItem),
                     brandId,
@@ -331,10 +365,11 @@ export default function CreateSingleTradeInPage() {
                     deviceImages: imageData.deviceUrls.length > 0 ? JSON.stringify(imageData.deviceUrls) : undefined,
                     cccdFrontUrl: imageData.cccdFrontUrl || undefined,
                     cccdBackUrl: imageData.cccdBackUrl || undefined,
+                    customData: Object.keys(programCustomValues).length > 0 ? JSON.stringify(programCustomValues) : undefined,
                 }],
             });
         },
-        onSuccess: () => navigate('/trade-in-xiaomi'),
+        onSuccess: () => navigate(tradeInProgramId ? `/trade-in/programs/${tradeInProgramId}` : '/trade-in'),
         onError: (err: any) => {
             setError(err.response?.data?.message || 'Có lỗi xảy ra khi tạo');
             setUploading(false);
@@ -358,6 +393,28 @@ export default function CreateSingleTradeInPage() {
             });
         if (missingRequired.length > 0) {
             setError(`Vui lòng nhập: ${missingRequired.map(a => a.name).join(', ')}`);
+            return;
+        }
+
+        const missingProgramCustom = programCustomFields.filter(f => f.required && (!programCustomValues[f.key] || String(programCustomValues[f.key]).trim() === ''));
+        if (missingProgramCustom.length > 0) {
+            setError(`Vui lòng nhập/chọn thông tin chương trình: ${missingProgramCustom.map(f => f.label).join(', ')}`);
+            return;
+        }
+
+        const missingStandard = Object.keys(STANDARD_FIELDS_MAP).filter(key => {
+            const conf = defaultFieldConfig[key];
+            if (conf?.required && conf?.visible !== false) {
+                if (key === 'cccdFront') return !cccdFrontFile;
+                if (key === 'cccdBack') return !cccdBackFile;
+                const val = (item as any)[key];
+                return val === undefined || val === null || String(val).trim() === '';
+            }
+            return false;
+        });
+
+        if (missingStandard.length > 0) {
+            setError(`Vui lòng nhập thông tin: ${missingStandard.map(k => STANDARD_FIELDS_MAP[k]).join(', ')}`);
             return;
         }
 
@@ -397,7 +454,7 @@ export default function CreateSingleTradeInPage() {
     return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
             <div>
-                <button onClick={() => navigate('/trade-in-xiaomi')} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 13, color: '#6366f1', background: 'none', border: 'none', cursor: 'pointer', marginBottom: 12, fontWeight: 600 }}>
+                <button onClick={() => navigate(tradeInProgramId ? `/trade-in/programs/${tradeInProgramId}` : '/trade-in')} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 13, color: '#6366f1', background: 'none', border: 'none', cursor: 'pointer', marginBottom: 12, fontWeight: 600 }}>
                     <ArrowLeft size={15} /> Quay lại danh sách
                 </button>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
@@ -422,7 +479,25 @@ export default function CreateSingleTradeInPage() {
             <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
 
                 {/* Step 1: Điều phối */}
-                <SectionCard step="1" title="Điều phối" subtitle="Từ cửa hàng nào và nhập kho nào?" color="linear-gradient(135deg,#6366f1,#8b5cf6)">
+                <SectionCard step="1" title="Điều phối" subtitle="Chương trình, cửa hàng và kho nhận" color="linear-gradient(135deg,#6366f1,#8b5cf6)">
+                    {/* Program selector */}
+                    {!routeProgramId && (
+                        <div style={{ marginBottom: 16 }}>
+                            <Field label="Chương trình thu cũ" icon={<Package size={12} color="#6366f1" />}>
+                                <select value={tradeInProgramId} onChange={e => setTradeInProgramId(e.target.value)} style={{ ...inputStyle, appearance: 'none' }}>
+                                    <option value="">— Không gắn chương trình —</option>
+                                    {programs.filter((p: any) => p.isActive).map((p: any) => (
+                                        <option key={p.id} value={p.id}>{p.name} ({p.code})</option>
+                                    ))}
+                                </select>
+                            </Field>
+                        </div>
+                    )}
+                    {routeProgramId && programs.length > 0 && (
+                        <div style={{ marginBottom: 16, padding: '10px 14px', background: '#eef2ff', borderRadius: 10, border: '1.5px solid #c7d2fe', fontSize: 13, color: '#6366f1', fontWeight: 600 }}>
+                            Chương trình: {programs.find((p: any) => p.id === routeProgramId)?.name ?? routeProgramId}
+                        </div>
+                    )}
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
                         <Field label="Cửa hàng gửi *" icon={<Building2 size={12} color="#6366f1" />}>
                             <select value={supplierId} onChange={e => setSupplierId(e.target.value)} required style={{ ...inputStyle, appearance: 'none' }}>
@@ -677,103 +752,139 @@ export default function CreateSingleTradeInPage() {
                                 </div>
                             </div>
                         )}
-                        <Field label="Serial / IMEI">
+                        <FieldWithConfig fieldKey="serialNumber" defaultLabel="Serial / IMEI">
                             <input type="text" name="serialNumber" style={inputStyle} value={item.serialNumber} onChange={onInput} placeholder="Số IMEI" />
-                        </Field>
-                        <Field label="Loại test máy" col={3}>
+                        </FieldWithConfig>
+                        <FieldWithConfig fieldKey="notes" defaultLabel="Loại test máy" col={3}>
                             <input type="text" name="notes" style={inputStyle} value={item.notes} onChange={onInput} placeholder="VD: Màn xước nhẹ, vỏ cấn góc..." />
-                        </Field>
-                        <Field label="Số hợp đồng">
+                        </FieldWithConfig>
+                        <FieldWithConfig fieldKey="contractNumber" defaultLabel="Số hợp đồng">
                             <input type="text" name="contractNumber" style={inputStyle} value={item.contractNumber} onChange={onInput} />
-                        </Field>
-                        <Field label="Ngày mua">
+                        </FieldWithConfig>
+                        <FieldWithConfig fieldKey="purchaseDate" defaultLabel="Ngày mua">
                             <input type="date" style={inputStyle} value={item.purchaseDate ? item.purchaseDate.split('T')[0] : ''} onChange={e => setItem({ ...item, purchaseDate: e.target.value ? new Date(e.target.value).toISOString() : undefined })} />
-                        </Field>
-                        <Field label="Tên NV thu">
+                        </FieldWithConfig>
+                        <FieldWithConfig fieldKey="employeeName" defaultLabel="Tên NV thu">
                             <input type="text" name="employeeName" style={inputStyle} value={item.employeeName} onChange={onInput} />
-                        </Field>
-                        <Field label="Giá thu mua (đ)" icon={<DollarSign size={12} color="#f97316" />}>
+                        </FieldWithConfig>
+                        <FieldWithConfig fieldKey="estimatedValue" defaultLabel="Giá thu mua (đ)" icon={<DollarSign size={12} color="#f97316" />}>
                             <input type="number" name="estimatedValue" style={inputStyle} value={item.estimatedValue || ''} onChange={onInput} placeholder="0" />
-                        </Field>
-                        <Field label="Chi phí khác (đ)">
+                        </FieldWithConfig>
+                        <FieldWithConfig fieldKey="otherCosts" defaultLabel="Chi phí khác (đ)">
                             <input type="number" name="otherCosts" style={inputStyle} value={item.otherCosts || ''} onChange={onInput} placeholder="0" />
-                        </Field>
-                        <Field label="Bù thêm (đ)">
+                        </FieldWithConfig>
+                        <FieldWithConfig fieldKey="topUp" defaultLabel="Bù thêm (đ)">
                             <input type="number" name="topUp" style={inputStyle} value={item.topUp || ''} onChange={onInput} placeholder="0" />
-                        </Field>
+                        </FieldWithConfig>
                         <div style={{ gridColumn: '1 / 3', display: 'flex', alignItems: 'center', background: '#f0f4ff', padding: '10px 16px', borderRadius: 10 }}>
                             <DollarSign size={16} color="#6366f1" style={{ marginRight: 8 }} />
                             <span style={{ fontSize: 13, color: '#6366f1', fontWeight: 700, marginRight: 8 }}>Tổng giá thu:</span>
                             <span style={{ fontWeight: 900, fontSize: 20, color: '#4338ca' }}>{totalPrice.toLocaleString('vi-VN')} đ</span>
                         </div>
-                        <Field label="Giá sửa chữa (đ)" icon={<Wrench size={12} color="#f97316" />}>
+                        <FieldWithConfig fieldKey="repairCost" defaultLabel="Giá sửa chữa (đ)" icon={<Wrench size={12} color="#f97316" />}>
                             <input type="number" name="repairCost" style={inputStyle} value={item.repairCost || ''} onChange={onInput} placeholder="0" />
-                        </Field>
+                        </FieldWithConfig>
+
+                        {/* Custom fields from Trade-In Program */}
+                        {programCustomFields.length > 0 && (
+                            <div style={{ gridColumn: '1 / -1', marginTop: 8, padding: '16px', background: '#f8fafc', borderRadius: 12, border: '1px dashed #cbd5e1' }}>
+                                <div style={{ fontSize: 13, fontWeight: 800, color: '#0f172a', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 6 }}>
+                                    <Package size={16} color="#6366f1" />
+                                    Thông tin riêng của chương trình
+                                </div>
+                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,1fr)', gap: 16 }}>
+                                    {programCustomFields.map((field, index) => (
+                                        <Field key={field.key || index} label={`${field.label}${field.required ? ' *' : ''}`}>
+                                            {field.type === 'textarea' ? (
+                                                <textarea style={{ ...inputStyle, minHeight: 60, paddingTop: 10, resize: 'vertical' }} value={programCustomValues[field.key] || ''} onChange={(e) => setProgramCustomValues(p => ({ ...p, [field.key]: e.target.value }))} />
+                                            ) : field.type === 'select' ? (
+                                                <select style={{ ...inputStyle, appearance: 'none' }} value={programCustomValues[field.key] || ''} onChange={(e) => setProgramCustomValues(p => ({ ...p, [field.key]: e.target.value }))}>
+                                                    <option value="">— Chọn —</option>
+                                                    {(field.options || []).map((o: string, idx: number) => <option key={`${o}_${idx}`} value={o}>{o}</option>)}
+                                                </select>
+                                            ) : (
+                                                <input type={field.type === 'date' ? 'date' : field.type === 'number' ? 'number' : 'text'} style={inputStyle} value={programCustomValues[field.key] || ''} onChange={(e) => setProgramCustomValues(p => ({ ...p, [field.key]: e.target.value }))} />
+                                            )}
+                                        </Field>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
                     </div>
                 </SectionCard>
 
                 {/* Step 4: Khách hàng */}
                 <SectionCard step="4" title="Thông tin Khách hàng" subtitle="Người bán máy cho cửa hàng" color="linear-gradient(135deg,#10b981,#059669)">
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 16 }}>
-                        <Field label="Tên khách hàng" icon={<User size={12} color="#059669" />}>
+                        <FieldWithConfig fieldKey="sourceCustomerName" defaultLabel="Tên khách hàng" icon={<User size={12} color="#059669" />}>
                             <input type="text" name="sourceCustomerName" style={inputStyle} value={item.sourceCustomerName} onChange={onInput} />
-                        </Field>
-                        <Field label="Số điện thoại" icon={<Phone size={12} color="#059669" />}>
+                        </FieldWithConfig>
+                        <FieldWithConfig fieldKey="sourceCustomerPhone" defaultLabel="Số điện thoại" icon={<Phone size={12} color="#059669" />}>
                             <input type="text" name="sourceCustomerPhone" style={inputStyle} value={item.sourceCustomerPhone} onChange={onInput} />
-                        </Field>
-                        <Field label="Địa chỉ" icon={<MapPin size={12} color="#059669" />}>
+                        </FieldWithConfig>
+                        <FieldWithConfig fieldKey="sourceCustomerAddress" defaultLabel="Địa chỉ" icon={<MapPin size={12} color="#059669" />}>
                             <input type="text" name="sourceCustomerAddress" style={inputStyle} value={item.sourceCustomerAddress} onChange={onInput} />
-                        </Field>
-                        <Field label="Số CCCD" icon={<CreditCard size={12} color="#059669" />}>
+                        </FieldWithConfig>
+                        <FieldWithConfig fieldKey="sourceCustomerIdCard" defaultLabel="Số CCCD" icon={<CreditCard size={12} color="#059669" />}>
                             <input type="text" name="sourceCustomerIdCard" style={inputStyle} value={item.sourceCustomerIdCard} onChange={onInput} />
-                        </Field>
-                        <Field label="Ngày cấp CCCD">
+                        </FieldWithConfig>
+                        <FieldWithConfig fieldKey="idCardIssueDate" defaultLabel="Ngày cấp CCCD">
                             <input type="date" style={inputStyle} value={item.idCardIssueDate ? item.idCardIssueDate.split('T')[0] : ''} onChange={e => setItem({ ...item, idCardIssueDate: e.target.value ? new Date(e.target.value).toISOString() : undefined })} />
-                        </Field>
-                        <Field label="Nơi cấp CCCD">
+                        </FieldWithConfig>
+                        <FieldWithConfig fieldKey="idCardIssuePlace" defaultLabel="Nơi cấp CCCD">
                             <input type="text" name="idCardIssuePlace" style={inputStyle} value={item.idCardIssuePlace} onChange={onInput} />
-                        </Field>
-                        <Field label="Số TK Ngân hàng" icon={<CreditCard size={12} color="#059669" />}>
+                        </FieldWithConfig>
+                        <FieldWithConfig fieldKey="bankAccount" defaultLabel="Số TK Ngân hàng" icon={<CreditCard size={12} color="#059669" />}>
                             <input type="text" name="bankAccount" style={inputStyle} value={item.bankAccount} onChange={onInput} />
-                        </Field>
-                        <Field label="Tên Ngân hàng" col={2}>
+                        </FieldWithConfig>
+                        <FieldWithConfig fieldKey="bankName" defaultLabel="Tên Ngân hàng" col={2}>
                             <input type="text" name="bankName" style={inputStyle} value={item.bankName} onChange={onInput} />
-                        </Field>
+                        </FieldWithConfig>
                     </div>
                 </SectionCard>
 
                 {/* Step 5: Ảnh CCCD */}
-                <SectionCard step="5" title="Ảnh CCCD / Giấy tờ tùy thân" subtitle="Tải lên 2 mặt CCCD — lưu server, không gây lỗi quá tải" color="linear-gradient(135deg,#0ea5e9,#6366f1)">
+                {(defaultFieldConfig['cccdFront']?.visible !== false || defaultFieldConfig['cccdBack']?.visible !== false) && (
+                <SectionCard step="5" title="Ảnh CCCD / Giấy tờ tùy thân" subtitle="Tải lên mặt CCCD — lưu server, không gây lỗi quá tải" color="linear-gradient(135deg,#0ea5e9,#6366f1)">
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
-                        <ImageBox
-                            label="Mặt trước CCCD"
-                            subLabel="Ảnh rõ nét, đủ 4 góc, không mờ"
-                            file={cccdFrontFile}
-                            preview={cccdFrontPreview}
-                            onPick={(f, p) => { setCccdFrontFile(f); setCccdFrontPreview(p); }}
-                            onClear={() => { setCccdFrontFile(null); setCccdFrontPreview(''); }}
-                        />
-                        <ImageBox
-                            label="Mặt sau CCCD"
-                            subLabel="Hiện rõ mã QR và vân tay"
-                            file={cccdBackFile}
-                            preview={cccdBackPreview}
-                            onPick={(f, p) => { setCccdBackFile(f); setCccdBackPreview(p); }}
-                            onClear={() => { setCccdBackFile(null); setCccdBackPreview(''); }}
-                        />
+                        {defaultFieldConfig['cccdFront']?.visible !== false && (
+                            <ImageBox
+                                label={`Mặt trước CCCD${defaultFieldConfig['cccdFront']?.required ? ' *' : ''}`}
+                                subLabel="Ảnh rõ nét, đủ 4 góc, không mờ"
+                                file={cccdFrontFile}
+                                preview={cccdFrontPreview}
+                                onPick={(f, p) => { setCccdFrontFile(f); setCccdFrontPreview(p); }}
+                                onClear={() => { setCccdFrontFile(null); setCccdFrontPreview(''); }}
+                            />
+                        )}
+                        {defaultFieldConfig['cccdBack']?.visible !== false && (
+                            <ImageBox
+                                label={`Mặt sau CCCD${defaultFieldConfig['cccdBack']?.required ? ' *' : ''}`}
+                                subLabel="Hiện rõ mã QR và vân tay"
+                                file={cccdBackFile}
+                                preview={cccdBackPreview}
+                                onPick={(f, p) => { setCccdBackFile(f); setCccdBackPreview(p); }}
+                                onClear={() => { setCccdBackFile(null); setCccdBackPreview(''); }}
+                            />
+                        )}
                     </div>
                     <div style={{ display: 'flex', gap: 10, marginTop: 14, flexWrap: 'wrap' }}>
-                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '4px 12px', borderRadius: 20, fontSize: 12, fontWeight: 700, background: cccdFrontFile ? '#dcfce7' : '#f1f5f9', color: cccdFrontFile ? '#166534' : '#64748b' }}>
-                            {cccdFrontFile ? '✅' : '⬜'} Mặt trước
-                        </span>
-                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '4px 12px', borderRadius: 20, fontSize: 12, fontWeight: 700, background: cccdBackFile ? '#dcfce7' : '#f1f5f9', color: cccdBackFile ? '#166534' : '#64748b' }}>
-                            {cccdBackFile ? '✅' : '⬜'} Mặt sau
-                        </span>
+                        {defaultFieldConfig['cccdFront']?.visible !== false && (
+                            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '4px 12px', borderRadius: 20, fontSize: 12, fontWeight: 700, background: cccdFrontFile ? '#dcfce7' : '#f1f5f9', color: cccdFrontFile ? '#166534' : '#64748b' }}>
+                                {cccdFrontFile ? '✅' : '⬜'} Mặt trước
+                            </span>
+                        )}
+                        {defaultFieldConfig['cccdBack']?.visible !== false && (
+                            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '4px 12px', borderRadius: 20, fontSize: 12, fontWeight: 700, background: cccdBackFile ? '#dcfce7' : '#f1f5f9', color: cccdBackFile ? '#166534' : '#64748b' }}>
+                                {cccdBackFile ? '✅' : '⬜'} Mặt sau
+                            </span>
+                        )}
                         <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '4px 12px', borderRadius: 20, fontSize: 12, fontWeight: 700, background: deviceFiles.length > 0 ? '#dcfce7' : '#f1f5f9', color: deviceFiles.length > 0 ? '#166534' : '#64748b' }}>
                             {deviceFiles.length > 0 ? '✅' : '⬜'} {deviceFiles.length} ảnh thiết bị
                         </span>
                     </div>
                 </SectionCard>
+                )}
 
                 {/* Actions */}
                 <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12, paddingBottom: 32 }}>

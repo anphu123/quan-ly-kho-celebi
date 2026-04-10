@@ -40,14 +40,57 @@ export default function InboundDetailPage() {
         }
     };
 
-    const handleStartReceiving = async () => {
+
+    const handleSubmitForApproval = async () => {
         if (!inbound) return;
         try {
             setSubmitting(true);
-            const updated = await inboundApi.startReceiving(inbound.id);
+            const updated = await inboundApi.submitForApproval(inbound.id);
             setInbound(updated);
         } catch (err: any) {
-            setError(err.response?.data?.message || 'Lỗi khi bắt đầu nhận hàng');
+            setError(err.response?.data?.message || 'Lỗi khi gửi duyệt');
+        } finally {
+            setSubmitting(false);
+        }
+    };
+
+    const handleApprove = async () => {
+        if (!inbound) return;
+        try {
+            setSubmitting(true);
+            const updated = await inboundApi.approveInbound(inbound.id);
+            setInbound(updated);
+        } catch (err: any) {
+            setError(err.response?.data?.message || 'Lỗi khi duyệt phiếu');
+        } finally {
+            setSubmitting(false);
+        }
+    };
+
+    const handleReject = async () => {
+        if (!inbound) return;
+        const reason = window.prompt('Lý do từ chối (tùy chọn):');
+        if (reason === null) return; // user cancelled
+        try {
+            setSubmitting(true);
+            const updated = await inboundApi.rejectInbound(inbound.id, reason || undefined);
+            setInbound(updated);
+        } catch (err: any) {
+            setError(err.response?.data?.message || 'Lỗi khi từ chối phiếu');
+        } finally {
+            setSubmitting(false);
+        }
+    };
+
+    const handleConfirmEntry = async () => {
+        if (!inbound) return;
+        if (!window.confirm('Xác nhận duyệt nhập kho? Thiết bị sẽ được tạo serial và vào tồn kho.')) return;
+        try {
+            setSubmitting(true);
+            const updated = await inboundApi.confirmWarehouseEntry(inbound.id);
+            setInbound(updated);
+        } catch (err: any) {
+            setError(err.response?.data?.message || 'Lỗi khi duyệt nhập kho');
         } finally {
             setSubmitting(false);
         }
@@ -71,8 +114,8 @@ export default function InboundDetailPage() {
             // Fetch dynamic attributes for this category
             const groups = await attributesApi.getGroupsByCategory(item.categoryId);
             setAttributeGroups(groups);
-        } catch (err) {
-            console.error('Lỗi khi tải thuộc tính động', err);
+        } catch {
+            // attribute groups are optional — silently ignore failures
         }
     };
 
@@ -161,8 +204,8 @@ export default function InboundDetailPage() {
                         <h1 className="page-title" style={{ marginBottom: 0 }}>{inbound.code}</h1>
                         <span style={{
                             padding: '0.25rem 0.75rem', borderRadius: '99px', fontSize: '0.75rem', fontWeight: 700,
-                            background: inbound.status === 'COMPLETED' ? '#d1fae5' : inbound.status === 'IN_PROGRESS' ? '#fef3c7' : '#dbeafe',
-                            color: inbound.status === 'COMPLETED' ? '#065f46' : inbound.status === 'IN_PROGRESS' ? '#92400e' : '#1e40af'
+                            background: inbound.status === 'COMPLETED' ? '#d1fae5' : inbound.status === 'IN_PROGRESS' ? '#fef3c7' : inbound.status === 'PENDING_APPROVAL' ? '#fff7ed' : inbound.status === 'PENDING_WAREHOUSE_ENTRY' ? '#faf5ff' : inbound.status === 'REJECTED' ? '#fef2f2' : '#dbeafe',
+                            color: inbound.status === 'COMPLETED' ? '#065f46' : inbound.status === 'IN_PROGRESS' ? '#92400e' : inbound.status === 'PENDING_APPROVAL' ? '#c2410c' : inbound.status === 'PENDING_WAREHOUSE_ENTRY' ? '#7e22ce' : inbound.status === 'REJECTED' ? '#b91c1c' : '#1e40af'
                         }}>
                             {inboundApi.getStatusBadge(inbound.status)}
                         </span>
@@ -173,17 +216,46 @@ export default function InboundDetailPage() {
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
                     {inbound.status === 'REQUESTED' && (
                         <button
-                            onClick={handleStartReceiving}
+                            onClick={handleSubmitForApproval}
                             disabled={submitting}
                             style={{
                                 display: 'inline-flex', alignItems: 'center', gap: '0.5rem',
-                                padding: '0.625rem 1.25rem', background: '#4f46e5', color: 'white',
+                                padding: '0.625rem 1.25rem', background: '#f97316', color: 'white',
                                 borderRadius: '0.875rem', fontWeight: 700, fontSize: '0.875rem',
                                 border: 'none', cursor: 'pointer', opacity: submitting ? 0.5 : 1
                             }}
                         >
-                            <Play size={16} /> Bắt đầu kiểm hàng (QC)
+                            <Play size={16} /> Gửi duyệt
                         </button>
+                    )}
+
+                    {inbound.status === 'PENDING_APPROVAL' && (
+                        <>
+                            <button
+                                onClick={handleApprove}
+                                disabled={submitting}
+                                style={{
+                                    display: 'inline-flex', alignItems: 'center', gap: '0.5rem',
+                                    padding: '0.625rem 1.25rem', background: '#4f46e5', color: 'white',
+                                    borderRadius: '0.875rem', fontWeight: 700, fontSize: '0.875rem',
+                                    border: 'none', cursor: 'pointer', opacity: submitting ? 0.5 : 1
+                                }}
+                            >
+                                <CheckCircle size={16} /> Duyệt phiếu
+                            </button>
+                            <button
+                                onClick={handleReject}
+                                disabled={submitting}
+                                style={{
+                                    display: 'inline-flex', alignItems: 'center', gap: '0.5rem',
+                                    padding: '0.625rem 1.25rem', background: '#fef2f2', color: '#b91c1c',
+                                    borderRadius: '0.875rem', fontWeight: 700, fontSize: '0.875rem',
+                                    border: '1.5px solid #fecaca', cursor: 'pointer', opacity: submitting ? 0.5 : 1
+                                }}
+                            >
+                                Từ chối
+                            </button>
+                        </>
                     )}
 
                     {inbound.status === 'IN_PROGRESS' && (
@@ -197,8 +269,37 @@ export default function InboundDetailPage() {
                                 border: 'none', cursor: 'pointer', opacity: submitting ? 0.5 : 1
                             }}
                         >
-                            <CheckCircle size={16} /> Hoàn thành phiếu nhập
+                            <CheckCircle size={16} /> Gửi duyệt nhập kho
                         </button>
+                    )}
+
+                    {inbound.status === 'PENDING_WAREHOUSE_ENTRY' && (
+                        <>
+                            <button
+                                onClick={handleConfirmEntry}
+                                disabled={submitting}
+                                style={{
+                                    display: 'inline-flex', alignItems: 'center', gap: '0.5rem',
+                                    padding: '0.625rem 1.25rem', background: '#7c3aed', color: 'white',
+                                    borderRadius: '0.875rem', fontWeight: 700, fontSize: '0.875rem',
+                                    border: 'none', cursor: 'pointer', opacity: submitting ? 0.5 : 1
+                                }}
+                            >
+                                <CheckCircle size={16} /> Duyệt nhập kho
+                            </button>
+                            <button
+                                onClick={handleReject}
+                                disabled={submitting}
+                                style={{
+                                    display: 'inline-flex', alignItems: 'center', gap: '0.5rem',
+                                    padding: '0.625rem 1.25rem', background: '#fef2f2', color: '#b91c1c',
+                                    borderRadius: '0.875rem', fontWeight: 700, fontSize: '0.875rem',
+                                    border: '1.5px solid #fecaca', cursor: 'pointer', opacity: submitting ? 0.5 : 1
+                                }}
+                            >
+                                Từ chối nhập kho
+                            </button>
+                        </>
                     )}
                 </div>
             </div>

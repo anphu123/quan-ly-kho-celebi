@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
-import { SerialStatus, Grade, MovementType } from '@prisma/client';
+import { SerialStatus, Grade, MovementType, TrackingMethod } from '@prisma/client';
 
 @Injectable()
 export class StockService {
@@ -292,9 +292,9 @@ export class StockService {
   // ===========================
 
   /**
-   * Tính live stock levels từ SerialItem (source of truth)
+   * Tính live stock từ SerialItem cho SERIAL_BASED products (source of truth)
    */
-  private async computeLiveStockLevels(warehouseId?: string) {
+  private async computeSerialBasedStock(warehouseId?: string) {
     const items = await this.prisma.serialItem.findMany({
       where: {
         ...(warehouseId ? { warehouseId } : {}),
@@ -322,6 +322,7 @@ export class StockService {
         const settings = settingsMap.get(key);
         groups.set(key, {
           id: key,
+          trackingMethod: TrackingMethod.SERIAL_BASED,
           productTemplateId: item.productTemplateId,
           warehouseId: item.warehouseId,
           productTemplate: item.productTemplate,
@@ -353,7 +354,38 @@ export class StockService {
     result.forEach(g => {
       g.averageCost = g.physicalQty > 0 ? g.totalValue / g.physicalQty : 0;
     });
-    return result.sort((a, b) => b.availableQty - a.availableQty);
+    return result;
+  }
+
+  /**
+   * Lấy stock cho QUANTITY_BASED products từ StockLevel table
+   */
+  private async computeQuantityBasedStock(warehouseId?: string) {
+    const levels = await this.prisma.stockLevel.findMany({
+      where: {
+        ...(warehouseId ? { warehouseId } : {}),
+        productTemplate: { category: { trackingMethod: TrackingMethod.QUANTITY_BASED } },
+      },
+      include: {
+        warehouse: true,
+        productTemplate: { include: { category: true, brand: true } },
+      },
+    });
+
+    return levels.map(l => ({ ...l, trackingMethod: TrackingMethod.QUANTITY_BASED }));
+  }
+
+  /**
+   * Hợp nhất stock từ cả hai tracking method
+   */
+  private async computeLiveStockLevels(warehouseId?: string) {
+    const [serialBased, quantityBased] = await Promise.all([
+      this.computeSerialBasedStock(warehouseId),
+      this.computeQuantityBasedStock(warehouseId),
+    ]);
+
+    return [...serialBased, ...quantityBased]
+      .sort((a, b) => (b.availableQty ?? 0) - (a.availableQty ?? 0));
   }
 
   /**
@@ -374,18 +406,55 @@ export class StockService {
    * Lấy tồn kho theo product
    */
   async getStockLevelsByProduct(productTemplateId: string) {
-    return this.prisma.stockLevel.findMany({
-      where: { productTemplateId },
-      include: {
-        warehouse: true,
-        productTemplate: {
-          include: {
-            category: true,
-            brand: true,
-          },
-        },
-      },
+    const product = await this.prisma.productTemplate.findUnique({
+      where: { id: productTemplateId },
+      include: { category: true },
     });
+
+    if (product?.category?.trackingMethod === TrackingMethod.QUANTITY_BASED) {
+      return this.prisma.stockLevel.findMany({
+        where: { productTemplateId },
+        include: {
+          warehouse: true,
+          productTemplate: { include: { category: true, brand: true } },
+        },
+      });
+    }
+
+    // SERIAL_BASED: compute from SerialItems
+    const serialItems = await this.prisma.serialItem.findMany({
+      where: {
+        productTemplateId,
+        status: { notIn: [SerialStatus.SOLD, SerialStatus.DISPOSED] },
+      },
+      include: { warehouse: true },
+    });
+
+    const groups = new Map<string, any>();
+    for (const item of serialItems) {
+      const key = item.warehouseId;
+      if (!groups.has(key)) {
+        groups.set(key, {
+          productTemplateId,
+          warehouseId: item.warehouseId,
+          warehouse: item.warehouse,
+          trackingMethod: TrackingMethod.SERIAL_BASED,
+          physicalQty: 0, incomingQty: 0, qcInProgressQty: 0,
+          availableQty: 0, reservedQty: 0, refurbishingQty: 0,
+          damagedQty: 0, returnedQty: 0, totalValue: 0, averageCost: 0,
+        });
+      }
+      const g = groups.get(key);
+      g.physicalQty++;
+      g.totalValue += Number(item.currentCostPrice) || 0;
+      const field = this.getStatusField(item.status);
+      if (field && field in g) g[field]++;
+    }
+
+    return Array.from(groups.values()).map(g => ({
+      ...g,
+      averageCost: g.physicalQty > 0 ? g.totalValue / g.physicalQty : 0,
+    }));
   }
 
   /**

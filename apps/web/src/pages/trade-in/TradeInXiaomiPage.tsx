@@ -12,6 +12,7 @@ import { inboundApi } from '../../api/inbound.api';
 import { uploadApi } from '../../api/upload.api';
 import { resolveImageUrl } from '../../lib/image';
 import { suppliersApi } from '../../lib/api/suppliers.api';
+import { tradeInProgramsApi } from '../../api/trade-in-programs.api';
 import { QRScannerModal } from '../../components/widgets/QRScannerModal';
 
 /* ── helpers ── */
@@ -233,6 +234,9 @@ export default function TradeInXiaomiPage() {
     const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
     const [isScanning, setIsScanning] = useState(false);
     const [isSearching, setIsSearching] = useState(false);
+
+    const { data: programs = [] } = useQuery({ queryKey: ['trade-in-programs'], queryFn: tradeInProgramsApi.getAll });
+    const xiaomiProgramId = programs.find((p: any) => p.code === 'XIAOMI')?.id || '';
 
 
     const receiveItemsMutation = useMutation({
@@ -458,7 +462,7 @@ export default function TradeInXiaomiPage() {
                         style={{ display: 'inline-flex', alignItems: 'center', gap: 7, padding: '9px 18px', background: '#fff', border: '1.5px solid #6366f1', borderRadius: 10, fontSize: 13, fontWeight: 700, color: '#6366f1', cursor: 'pointer', boxShadow: '0 4px 12px rgba(99,102,241,0.1)' }}>
                         <Plus size={16} /> Tạo lô thu cũ
                     </button>
-                    <button onClick={() => navigate('/trade-in-xiaomi/create-single')}
+                    <button onClick={() => xiaomiProgramId ? navigate(`/trade-in/programs/${xiaomiProgramId}/create-single`) : navigate('/trade-in-xiaomi/create-single')}
                         style={{ display: 'inline-flex', alignItems: 'center', gap: 7, padding: '9px 18px', background: 'linear-gradient(135deg,#6366f1,#8b5cf6)', border: 'none', borderRadius: 10, fontSize: 13, fontWeight: 700, color: '#fff', cursor: 'pointer', boxShadow: '0 4px 12px rgba(99,102,241,.35)' }}>
                         <Plus size={16} /> Tạo đơn thu cũ
                     </button>

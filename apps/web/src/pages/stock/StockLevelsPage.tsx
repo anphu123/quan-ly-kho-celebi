@@ -1,17 +1,114 @@
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { 
-  Package, Search, TrendingDown, AlertTriangle, 
+import { useNavigate } from 'react-router-dom';
+import {
+  Package, Search, TrendingDown, AlertTriangle,
   BarChart3, Loader2, RefreshCw, Box,
-  Warehouse as WarehouseIcon, Tag, Activity
+  Warehouse as WarehouseIcon, Tag, Activity,
+  ChevronDown, ChevronRight, ExternalLink
 } from 'lucide-react';
 import { stockApi } from '../../lib/api/stock.api';
 import { warehousesApi } from '../../lib/api/warehouses.api';
+import { inventoryApi, STATUS_LABELS } from '../../lib/api/inventory.api';
+import type { StockLevel } from '../../lib/api/stock.api';
+
+/* ── Expanded detail row ── */
+function ExpandedDetail({ stock }: { stock: StockLevel }) {
+  const navigate = useNavigate();
+  const { data, isLoading } = useQuery({
+    queryKey: ['serial-items-detail', stock.productTemplateId, stock.warehouseId, stock.grade],
+    queryFn: () => inventoryApi.getAllSerialItems({
+      warehouseId: stock.warehouseId,
+      ...(stock.grade ? { grade: stock.grade } as any : {}),
+    }).then(res => res.data.filter((s: any) =>
+      s.productTemplateId === stock.productTemplateId &&
+      s.status !== 'SOLD' && s.status !== 'DISPOSED'
+    )),
+  });
+
+  const statusColors: Record<string, { bg: string; color: string }> = {
+    INCOMING:       { bg: '#eff6ff', color: '#3b82f6' },
+    QC_IN_PROGRESS: { bg: '#fef9c3', color: '#854d0e' },
+    AVAILABLE:      { bg: '#dcfce7', color: '#15803d' },
+    RESERVED:       { bg: '#fce7f3', color: '#be185d' },
+    SOLD:           { bg: '#f1f5f9', color: '#475569' },
+    REFURBISHING:   { bg: '#ede9fe', color: '#7c3aed' },
+    DAMAGED:        { bg: '#fee2e2', color: '#dc2626' },
+    RETURNED:       { bg: '#ffedd5', color: '#c2410c' },
+    DISPOSED:       { bg: '#f1f5f9', color: '#94a3b8' },
+  };
+
+  return (
+    <tr>
+      <td colSpan={10} style={{ padding: 0, background: '#f8fafc', borderBottom: '2px solid #e2e8f0' }}>
+        <div style={{ padding: '1rem 1.5rem' }}>
+          {isLoading ? (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#94a3b8', padding: '0.75rem 0' }}>
+              <Loader2 size={16} className="animate-spin" /> Đang tải...
+            </div>
+          ) : !data?.length ? (
+            <p style={{ color: '#94a3b8', fontSize: 13, padding: '0.5rem 0' }}>Không có serial item nào.</p>
+          ) : (
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+              <thead>
+                <tr style={{ color: '#64748b', fontWeight: 700, fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                  <th style={{ textAlign: 'left', padding: '6px 10px', width: 140 }}>Mã nội bộ</th>
+                  <th style={{ textAlign: 'left', padding: '6px 10px' }}>Serial / IMEI</th>
+                  <th style={{ textAlign: 'left', padding: '6px 10px' }}>Trạng thái</th>
+                  <th style={{ textAlign: 'left', padding: '6px 10px' }}>Vị trí</th>
+                  <th style={{ textAlign: 'right', padding: '6px 10px' }}>Giá vốn</th>
+                  <th style={{ textAlign: 'right', padding: '6px 10px' }}>Giá đề xuất</th>
+                  <th style={{ textAlign: 'center', padding: '6px 10px', width: 60 }}></th>
+                </tr>
+              </thead>
+              <tbody>
+                {data.map((item: any) => {
+                  const sc = statusColors[item.status] || { bg: '#f1f5f9', color: '#475569' };
+                  return (
+                    <tr key={item.id} style={{ borderTop: '1px solid #e2e8f0' }}>
+                      <td style={{ padding: '8px 10px', fontFamily: 'monospace', fontWeight: 700, color: '#4f46e5', fontSize: 12 }}>
+                        {item.internalCode}
+                      </td>
+                      <td style={{ padding: '8px 10px', color: item.serialNumber ? '#0f172a' : '#94a3b8' }}>
+                        {item.serialNumber || '—'}
+                      </td>
+                      <td style={{ padding: '8px 10px' }}>
+                        <span style={{ padding: '3px 10px', borderRadius: 99, fontSize: 11, fontWeight: 700, background: sc.bg, color: sc.color }}>
+                          {STATUS_LABELS[item.status as keyof typeof STATUS_LABELS] || item.status}
+                        </span>
+                      </td>
+                      <td style={{ padding: '8px 10px', color: '#64748b' }}>{item.binLocation?.name || '—'}</td>
+                      <td style={{ padding: '8px 10px', textAlign: 'right', fontWeight: 600, color: '#0f172a' }}>
+                        {stockApi.formatCurrency(item.currentCostPrice)}
+                      </td>
+                      <td style={{ padding: '8px 10px', textAlign: 'right', color: '#10b981', fontWeight: 600 }}>
+                        {stockApi.formatCurrency(item.suggestedPrice)}
+                      </td>
+                      <td style={{ padding: '8px 10px', textAlign: 'center' }}>
+                        <button
+                          onClick={() => navigate(`/inventory/${item.id}`)}
+                          style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#6366f1', display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 12, fontWeight: 600 }}
+                        >
+                          <ExternalLink size={13} />
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          )}
+        </div>
+      </td>
+    </tr>
+  );
+}
 
 export default function StockLevelsPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [warehouseFilter, setWarehouseFilter] = useState<string>('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'low' | 'available'>('all');
+  const [expandedId, setExpandedId] = useState<string | null>(null);
 
   const { data: stockLevels, isLoading, refetch } = useQuery({
     queryKey: ['stock-levels', warehouseFilter],
@@ -226,6 +323,7 @@ export default function StockLevelsPage() {
             <table className="data-table">
               <thead>
                 <tr>
+                  <th style={{ width: 40 }}></th>
                   <th style={{ minWidth: '280px' }}>Sản phẩm</th>
                   <th>Kho</th>
                   <th>Phân hạng</th>
@@ -241,12 +339,19 @@ export default function StockLevelsPage() {
                 {filteredStockLevels.map((stock) => {
                   const pendingQty = stock.incomingQty + stock.qcInProgressQty + stock.refurbishingQty + stock.returnedQty;
                   const isLowStock = stock.availableQty <= stock.reorderPoint;
-                  const availablePercent = stock.physicalQty > 0 
+                  const availablePercent = stock.physicalQty > 0
                     ? Math.round((stock.availableQty / stock.physicalQty) * 100)
                     : 0;
+                  const isExpanded = expandedId === stock.id;
 
                   return (
-                    <tr key={stock.id}>
+                    <React.Fragment key={stock.id}>
+                    <tr style={{ cursor: 'pointer', background: isExpanded ? '#f8faff' : undefined }} onClick={() => setExpandedId(isExpanded ? null : stock.id)}>
+                      <td style={{ textAlign: 'center', width: 40 }}>
+                        <span style={{ color: '#6366f1', display: 'inline-flex' }}>
+                          {isExpanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+                        </span>
+                      </td>
                       <td>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
                           <div style={{
@@ -368,6 +473,8 @@ export default function StockLevelsPage() {
                         )}
                       </td>
                     </tr>
+                    {isExpanded && <ExpandedDetail stock={stock} />}
+                    </React.Fragment>
                   );
                 })}
               </tbody>

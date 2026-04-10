@@ -86,12 +86,16 @@ export class MasterdataService {
     // ==========================================
     // WAREHOUSES
     // ==========================================
+    private readonly warehouseInclude = {
+        manager: { select: { id: true, fullName: true, email: true, role: true } },
+    };
+
     async findAllWarehouses(page = 1, limit = 10, search = '') {
         const where = search ? { name: { contains: search, mode: 'insensitive' as any } } : {};
         const skip = (page - 1) * limit;
 
         const [data, total] = await Promise.all([
-            this.prisma.warehouse.findMany({ where, skip, take: Number(limit), orderBy: { createdAt: 'desc' } }),
+            this.prisma.warehouse.findMany({ where, skip, take: Number(limit), orderBy: { createdAt: 'desc' }, include: this.warehouseInclude }),
             this.prisma.warehouse.count({ where })
         ]);
         return { data, meta: { total, page, limit, totalPages: Math.ceil(total / limit) } };
@@ -99,12 +103,25 @@ export class MasterdataService {
 
     async createWarehouse(data: any) {
         const code = 'WH-' + Date.now().toString().slice(-4);
-        return this.prisma.warehouse.create({ data: { ...data, code } });
+        const { managerId, ...rest } = data;
+        return this.prisma.warehouse.create({
+            data: { ...rest, code, ...(managerId ? { managerId } : {}) },
+            include: this.warehouseInclude,
+        });
     }
 
-    async findWarehouseById(id: string) { return this.prisma.warehouse.findUniqueOrThrow({ where: { id } }); }
+    async findWarehouseById(id: string) {
+        return this.prisma.warehouse.findUniqueOrThrow({ where: { id }, include: this.warehouseInclude });
+    }
 
-    async updateWarehouse(id: string, data: any) { return this.prisma.warehouse.update({ where: { id }, data }); }
+    async updateWarehouse(id: string, data: any) {
+        const { managerId, ...rest } = data;
+        return this.prisma.warehouse.update({
+            where: { id },
+            data: { ...rest, ...(managerId !== undefined ? { managerId: managerId || null } : {}) },
+            include: this.warehouseInclude,
+        });
+    }
 
     async deleteWarehouse(id: string) { return this.prisma.warehouse.delete({ where: { id } }); }
 

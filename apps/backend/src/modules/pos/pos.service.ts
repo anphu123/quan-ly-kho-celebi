@@ -87,7 +87,7 @@ export class PosService {
                         type: TransactionType.SOLD,
                         fromStatus: SerialStatus.AVAILABLE,
                         toStatus: SerialStatus.SOLD,
-                        fromLocation: dbItem.binLocation,
+                        fromLocation: dbItem.binLocationId,
                         notes: `Sold in Order ${orderCode}`,
                         performedById: userId,
                     }
