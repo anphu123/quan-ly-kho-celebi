@@ -39,7 +39,7 @@ const BrandsPage = lazy(() => import('./features/brands/BrandsPage'));
 const CategoryDetailPage = lazy(() => import('./features/categories/CategoryDetailPage'));
 const BrandDetailPage = lazy(() => import('./features/brands/BrandDetailPage'));
 const ProductTemplatesPage = lazy(() => import('./pages/products/ProductTemplatesPage'));
-const LogsPage = lazy(() => import('./pages/logs/LogsPage'));
+const LogsPage = lazy(() => import('./pages/activity-logs/LogsPage'));
 
 // --- Route Guards ---
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
