@@ -469,7 +469,6 @@ export class OutboundService {
                 serialItem: {
                     include: {
                         productTemplate: {
-                            select: { name: true, sku: true },
                             include: { brand: true, category: true }
                         },
                         warehouse: { select: { name: true, code: true } },
